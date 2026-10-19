@@ -5,6 +5,9 @@ Read with `02-technical-spec.md` (what and why), `04-workflow-catalogue.md`
 (what runs), `07-runbook.md` (how to operate) and `05-test-plan.md` (how we
 know it works).
 
+Repository (private, GitHub): https://github.com/Mfrostbutter/mb-agentic-race
+Mirror of the agentic-race paths of this engagement repo; sync with its `scripts/sync-from-engagement.sh`.
+
 ## 1. What was built
 
 Nineteen n8n workflows that take a Genesys call from the in-car button to a
