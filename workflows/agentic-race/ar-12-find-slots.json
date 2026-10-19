@@ -1,0 +1,531 @@
+{
+  "id": "JKVPMFrV5W4zbZfC",
+  "name": "AR-12 Tool: Find appointment slots",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## AR-12 FindSlots\nThe offered slots are written to the session row. BookAppointment refuses any slotId that was not offered in this call: slots are facts, not model output.",
+        "width": 768,
+        "height": 160,
+        "color": 7
+      },
+      "id": "2f0bb7f4-891f-5f7a-b140-f0e0199c5ba3",
+      "name": "Sticky1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "sessionId",
+              "type": "string"
+            },
+            {
+              "name": "dealerId",
+              "type": "string"
+            },
+            {
+              "name": "fromDate",
+              "type": "string"
+            },
+            {
+              "name": "serviceType",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "cdf24a25-20e9-5398-a5d4-b9ab67d56ffa",
+      "name": "ToolInput",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "r0DhjheXM3Dd6TF8"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sessionId",
+              "condition": "eq",
+              "keyValue": "={{ $json.sessionId }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "id": "62c49765-c83a-5630-8a12-d6aa748bd53c",
+      "name": "LoadSession",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/ar-mock/dsd/slots",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ dealerId: $('ToolInput').first().json.dealerId || $json.dealerId, fromDate: $('ToolInput').first().json.fromDate || '', serviceType: $('ToolInput').first().json.serviceType || '', market: $json.market }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "ed753780-744a-59ce-b8a4-77dc54a5d5bb",
+      "name": "CallDsdSlots",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Keeps at most three slots, labels them for speech, and prepares the session update.\nconst r = $json;\nconst inp = $('ToolInput').first().json;\nconst s = $('LoadSession').first().json;\nconst max = 3;\nconst days = { pl: ['niedziela','poniedziałek','wtorek','środa','czwartek','piątek','sobota'], es: ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'], de: ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'], en: ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'] };\nconst dn = days[s.language] || days.en;\nconst slots = (r.slots || []).slice(0, max).map(o => { const d = new Date(o.startsAt + 'Z'); return { slotId: o.slotId, startsAt: o.startsAt, dealerId: o.dealerId, dealerName: r.dealerName, label: `${dn[d.getUTCDay()]} ${o.startsAt.slice(8,10)}.${o.startsAt.slice(5,7)}. ${o.startsAt.slice(11,16)}` }; });\nconst result = slots.length\n  ? { ok: true, dealerId: r.dealerId, dealerName: r.dealerName, slots: slots.map(o => ({ slotId: o.slotId, when: o.label })), note: 'Offer these by day and time, never by slotId. When the caller picks one, use its slotId in BookAppointment.' }\n  : { ok: true, dealerId: r.dealerId, dealerName: r.dealerName, slots: [], note: r.reason === 'dealer_not_dsd_enabled' ? 'This dealer cannot be booked online. Hand off with SCENARIO_REQUIRES_AGENT.' : 'No slots in this window. Try once more with a later fromDate, then hand off with NO_SLOT.' };\nreturn [{ json: { result, offeredSlots: JSON.stringify(slots), dealerId: r.dealerId || inp.dealerId || s.dealerId, dealerName: r.dealerName || s.dealerName, sessionId: s.sessionId } }];"
+      },
+      "id": "eaabc68b-82d4-597a-a7cf-e4c899d9d4d9",
+      "name": "ShapeSlots",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "r0DhjheXM3Dd6TF8"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sessionId",
+              "condition": "eq",
+              "keyValue": "={{ $json.sessionId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "offeredSlots": "={{ $json.offeredSlots }}",
+            "dealerId": "={{ $json.dealerId }}",
+            "dealerName": "={{ $json.dealerName }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "correlationId",
+              "displayName": "correlationId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "caseId",
+              "displayName": "caseId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "market",
+              "displayName": "market",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "language",
+              "displayName": "language",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "intent",
+              "displayName": "intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "customerRef",
+              "displayName": "customerRef",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "vehicleRef",
+              "displayName": "vehicleRef",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "greetingName",
+              "displayName": "greetingName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "vehicleLabel",
+              "displayName": "vehicleLabel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "dealerId",
+              "displayName": "dealerId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "dealerName",
+              "displayName": "dealerName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "offeredSlots",
+              "displayName": "offeredSlots",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "slotId",
+              "displayName": "slotId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "bookingRef",
+              "displayName": "bookingRef",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confirmationCode",
+              "displayName": "confirmationCode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confirmationChannel",
+              "displayName": "confirmationChannel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confirmationSent",
+              "displayName": "confirmationSent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "handoffReason",
+              "displayName": "handoffReason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "handoffResult",
+              "displayName": "handoffResult",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "handoffSummary",
+              "displayName": "handoffSummary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "turns",
+              "displayName": "turns",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "startedAt",
+              "displayName": "startedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "endedAt",
+              "displayName": "endedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "endReason",
+              "displayName": "endReason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "lastLatencyMs",
+              "displayName": "lastLatencyMs",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "93458b5b-5de2-55a3-9b81-8a4d197726e0",
+      "name": "StoreOffered",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1040,
+        -80
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $('ShapeSlots').first().json.result }];"
+      },
+      "id": "2bcd3be0-4394-51f7-aa74-a15fc3f90c4b",
+      "name": "ReturnSlots",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Shapes a failed HTTP call into the sub-workflow's error contract. No throw: the caller branches on ok.\nconst e = $json.error || {};\nconst text = JSON.stringify(e);\nconst conflict = /409/.test(text);\nreturn [{ json: { ok: false, error: conflict ? 'slot_taken' : 'backend_unavailable',\n  message: conflict ? 'That slot was taken in the meantime. Call FindSlots again and offer new options.' : 'The backend system is unavailable. Apologise once and hand the caller to an agent (BACKEND_UNAVAILABLE).',\n  detail: String(e.message || '').slice(0, 200) } }];"
+      },
+      "id": "35d70e87-2900-5260-9655-700dc6d3c882",
+      "name": "ReturnSlotsError",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        120
+      ]
+    }
+  ],
+  "connections": {
+    "ToolInput": {
+      "main": [
+        [
+          {
+            "node": "LoadSession",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LoadSession": {
+      "main": [
+        [
+          {
+            "node": "CallDsdSlots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CallDsdSlots": {
+      "main": [
+        [
+          {
+            "node": "ShapeSlots",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ReturnSlotsError",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ShapeSlots": {
+      "main": [
+        [
+          {
+            "node": "StoreOffered",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "StoreOffered": {
+      "main": [
+        [
+          {
+            "node": "ReturnSlots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "Agent tool. Returns up to three bookable DSD Book slots for a dealer from a date. Inputs: sessionId (plumbed), dealerId, fromDate (YYYY-MM-DD), serviceType. Side effect: stores the offered slots on the session so BookAppointment can validate the choice."
+  }
+}

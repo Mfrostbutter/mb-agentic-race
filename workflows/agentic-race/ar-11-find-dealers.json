@@ -1,0 +1,176 @@
+{
+  "id": "IzLPW6qfY77E57tL",
+  "name": "AR-11 Tool: Find dealers",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## AR-11 FindDealers\nMarket comes from the session row, city from the model. Non-DSD dealers are returned flagged so the agent routes them to a handoff.",
+        "width": 704,
+        "height": 160,
+        "color": 7
+      },
+      "id": "9bc82f89-405e-55cc-a387-9528453d1f6d",
+      "name": "Sticky1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "sessionId",
+              "type": "string"
+            },
+            {
+              "name": "city",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "517c8317-6a55-5156-af32-e180a14877bd",
+      "name": "ToolInput",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "r0DhjheXM3Dd6TF8"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sessionId",
+              "condition": "eq",
+              "keyValue": "={{ $json.sessionId }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "id": "47b5b45c-5999-5c60-9e1a-16f7aee79e7e",
+      "name": "LoadSession",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/ar-mock/dsd/dealers",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ market: $json.market, city: $('ToolInput').first().json.city || '' }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "d42498d9-aa65-55b3-935b-8b5d976c7631",
+      "name": "CallDsdDealers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $json;\nconst dealers = (r.dealers || []).slice(0, 5);\nreturn [{ json: { ok: true, count: dealers.length, dealers, note: dealers.length ? 'Offer at most two by name. Dealers with dsdEnabled false cannot be booked here.' : 'No dealer matched. Ask for another city or offer the preferred dealer.' } }];"
+      },
+      "id": "dc51ca55-855f-5882-85ca-74dc01530782",
+      "name": "ShapeDealers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Shapes a failed HTTP call into the sub-workflow's error contract. No throw: the caller branches on ok.\nconst e = $json.error || {};\nconst text = JSON.stringify(e);\nconst conflict = /409/.test(text);\nreturn [{ json: { ok: false, error: conflict ? 'slot_taken' : 'backend_unavailable',\n  message: conflict ? 'That slot was taken in the meantime. Call FindSlots again and offer new options.' : 'The backend system is unavailable. Apologise once and hand the caller to an agent (BACKEND_UNAVAILABLE).',\n  detail: String(e.message || '').slice(0, 200) } }];"
+      },
+      "id": "51994285-87b5-5fe4-8e8f-d8f37cfcd5c7",
+      "name": "ReturnDealersError",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        120
+      ]
+    }
+  ],
+  "connections": {
+    "ToolInput": {
+      "main": [
+        [
+          {
+            "node": "LoadSession",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LoadSession": {
+      "main": [
+        [
+          {
+            "node": "CallDsdDealers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CallDsdDealers": {
+      "main": [
+        [
+          {
+            "node": "ShapeDealers",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ReturnDealersError",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "Agent tool. Lists Mercedes-Benz dealers for the session's market, optionally filtered by city. Inputs: sessionId (plumbed), city. Returns {ok, dealers:[{dealerId, name, city, dsdEnabled}]}."
+  }
+}

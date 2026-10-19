@@ -1,0 +1,99 @@
+{
+  "id": "MZ6ZWeaayvGtRh5o",
+  "name": "AR-MOCK-CRM Customer 360",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Mock CRM / Customer 360\nFour synthetic customers keyed by VIN. Unknown VIN returns found:false with HTTP 200.",
+        "width": 624,
+        "height": 160,
+        "color": 7
+      },
+      "id": "aaf4f345-7531-5700-93fb-17fce2e4adf5",
+      "name": "Sticky1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ar-mock/crm/customer-lookup",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "bf2f6ac8-c2da-5cdd-9a31-beb989da5303",
+      "name": "ReceiveLookup",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "78136690-0d92-5a8b-9834-e9b742c022d2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mock of CRM / Customer 360. Real build: HTTP Request to the MB customer API with a technical-user credential.\nconst b = $json.body || {};\nconst vin = String(b.vin || '').toUpperCase().trim();\nconst customers = {\n  'W1K2970461A123456': { customerRef: 'C-PL-004711', greetingName: 'Pani Kowalska', vehicleLabel: 'GLC 300 4MATIC', preferredDealerId: 'PL-WAW-01', preferredDealerName: 'Mercedes-Benz Warszawa Okęcie', market: 'PL', language: 'pl' },\n  'WDD2130421A654321': { customerRef: 'C-ES-002310', greetingName: 'Señor García', vehicleLabel: 'Clase E 220 d', preferredDealerId: 'ES-MAD-02', preferredDealerName: 'Mercedes-Benz Madrid Castellana', market: 'ES', language: 'es' },\n  'W1K1770871N998877': { customerRef: 'C-DE-009902', greetingName: 'Herr Weber', vehicleLabel: 'A 200', preferredDealerId: 'DE-STR-01', preferredDealerName: 'Mercedes-Benz Niederlassung Stuttgart', market: 'DE', language: 'de' },\n  'W1N2476011J112233': { customerRef: 'C-GB-001177', greetingName: 'Ms Patel', vehicleLabel: 'EQB 300', preferredDealerId: 'GB-LON-01', preferredDealerName: 'Mercedes-Benz of London West', market: 'GB', language: 'en' }\n};\nconst c = customers[vin];\nreturn [{ json: c ? { found: true, vin, ...c } : { found: false, vin } }];"
+      },
+      "id": "a1e2cd91-78c4-5eaa-aac2-5029b52953f1",
+      "name": "LookupFixture",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "ffb1dfd6-713e-5cae-806e-86aaaf21d1cd",
+      "name": "RespondCustomer",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        520,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "ReceiveLookup": {
+      "main": [
+        [
+          {
+            "node": "LookupFixture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LookupFixture": {
+      "main": [
+        [
+          {
+            "node": "RespondCustomer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "Lab stand-in for CRM / Customer 360. POST ar-mock/crm/customer-lookup {vin, msisdn} -> {found, customerRef, greetingName, vehicleLabel, preferredDealerId, ...}. Synthetic data only."
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "id": "sDq20rKHyBg3FQMW",
+  "name": "AR-MOCK-COMMS SMS and email",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Mock communication service\nReturns a message id. The real service resolves the customer's number or address from the CRM reference, so n8n never stores it.",
+        "width": 704,
+        "height": 160,
+        "color": 7
+      },
+      "id": "779e821a-4f77-5d5c-a18a-03d114a7b7e1",
+      "name": "Sticky1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ar-mock/comms/send",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f145e2a3-9037-55bf-a0b0-31d604353b6f",
+      "name": "ReceiveSend",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "61e75a4c-009c-56d5-9a3a-afa0bcefc129"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $json.body || {};\nif (!b.customerRef || !b.text) return [{ json: { accepted: false, error: 'customerRef and text are required' } }];\nreturn [{ json: { accepted: true, messageId: 'msg-' + Date.now().toString(36), channel: b.channel || 'sms', customerRef: b.customerRef, length: String(b.text).length } }];"
+      },
+      "id": "eb304d55-fd78-508e-a3cb-2fd11aed35e6",
+      "name": "ComputeMessage",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": "={{ $json.accepted ? 200 : 400 }}"
+        }
+      },
+      "id": "0c435a90-b323-5fab-93c2-7ead03e3ac54",
+      "name": "RespondSend",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        520,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "ReceiveSend": {
+      "main": [
+        [
+          {
+            "node": "ComputeMessage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ComputeMessage": {
+      "main": [
+        [
+          {
+            "node": "RespondSend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "Lab stand-in for the communication service. POST ar-mock/comms/send {channel, customerRef, language, text} -> {messageId}. Sends nothing."
+  }
+}

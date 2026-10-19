@@ -1,0 +1,193 @@
+{
+  "id": "0vBksVHyxkcHhpjf",
+  "name": "AR-05 API: Health and handoff context lookup",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## AR-05 Health and handoff lookup\nHealth is unauthenticated and cheap. The lookup is header-authenticated and returns only what the agent desktop needs.",
+        "width": 704,
+        "height": 160,
+        "color": 7
+      },
+      "id": "264e49c4-fd94-538e-9878-09b07a61d011",
+      "name": "Sticky1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "ar/v1/health",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "26f46d7f-9eed-5546-85e9-8c0f600e3d78",
+      "name": "HealthCheck",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "fb1be83e-742e-57d7-9067-6f4e53765dea"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, service: 'agentic-race', version: '0.1', at: $now.toUTC().toISO() }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "aa6ba855-a29a-51a9-bc69-d51c5cd29208",
+      "name": "RespondHealth",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "ar/v1/handoff",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "e3f44b5e-e2a8-5fd9-bf44-d00284572b42",
+      "name": "LookupHandoff",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "427ff28e-8368-55d6-8656-de86902452ad",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "h4JKKkzWoDb15aGN",
+          "name": "AR gateway bearer (lab)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "r0DhjheXM3Dd6TF8"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "correlationId",
+              "condition": "eq",
+              "keyValue": "={{ $json.query.correlationId }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "id": "3fc4304f-c4b7-5a8f-afdf-6da54254e11e",
+      "name": "LoadByCorrelation",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        200
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const s = $json;\nif (!s.sessionId) return [{ json: { found: false, statusCode: 404 } }];\nreturn [{ json: { found: true, statusCode: 200, correlationId: s.correlationId, sessionId: s.sessionId, caseId: s.caseId, state: s.state, intent: s.intent, handoffReason: s.handoffReason || null, handoffResult: s.handoffResult || null, summary: s.handoffSummary || '', dealer: s.dealerName || null, slotId: s.slotId || null, confirmationCode: s.confirmationCode || null, language: s.language, market: s.market, startedAt: s.startedAt, endedAt: s.endedAt || null } }];"
+      },
+      "id": "6b1a397e-1554-5c5e-a48c-162101f3511a",
+      "name": "ShapeHandoffContext",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": "={{ $json.statusCode }}"
+        }
+      },
+      "id": "045838d1-8621-5bb1-865c-e5c822b384fa",
+      "name": "RespondHandoffContext",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        780,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "HealthCheck": {
+      "main": [
+        [
+          {
+            "node": "RespondHealth",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LookupHandoff": {
+      "main": [
+        [
+          {
+            "node": "LoadByCorrelation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LoadByCorrelation": {
+      "main": [
+        [
+          {
+            "node": "ShapeHandoffContext",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ShapeHandoffContext": {
+      "main": [
+        [
+          {
+            "node": "RespondHandoffContext",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "GET /webhook/ar/v1/health for probes. GET /webhook/ar/v1/handoff?correlationId=... returns the handoff context (case, intent, reason, summary) for the Genesys agent desktop. No transcript."
+  }
+}

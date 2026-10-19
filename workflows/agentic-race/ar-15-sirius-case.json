@@ -1,0 +1,158 @@
+{
+  "id": "MVSHEW6jOTk7LGM1",
+  "name": "AR-15 Sirius case create, update or close",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## AR-15 Sirius case\nOne case per call, created at session start, updated at the end. Standard Salesforce REST behind the mock.",
+        "width": 704,
+        "height": 160,
+        "color": 7
+      },
+      "id": "8d211903-d0e5-56db-b7d5-189bded0fbda",
+      "name": "Sticky1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "op",
+              "type": "string"
+            },
+            {
+              "name": "correlationId",
+              "type": "string"
+            },
+            {
+              "name": "caseId",
+              "type": "string"
+            },
+            {
+              "name": "subject",
+              "type": "string"
+            },
+            {
+              "name": "classification",
+              "type": "string"
+            },
+            {
+              "name": "status",
+              "type": "string"
+            },
+            {
+              "name": "solution",
+              "type": "string"
+            },
+            {
+              "name": "delegatedReason",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "ff540651-0b78-5fa2-a21f-43cdbe00c3c9",
+      "name": "ToolInput",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/ar-mock/sirius/case",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "ef1e600c-7747-5809-932c-c9ef1d67acad",
+      "name": "CallSirius",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $json; return [{ json: { ok: true, caseId: r.caseId, status: r.status } }];"
+      },
+      "id": "39f96658-194d-5cce-85cb-3af00758f4e1",
+      "name": "ShapeCase",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Shapes a failed HTTP call into the sub-workflow's error contract. No throw: the caller branches on ok.\nconst e = $json.error || {};\nconst text = JSON.stringify(e);\nconst conflict = /409/.test(text);\nreturn [{ json: { ok: false, error: conflict ? 'slot_taken' : 'backend_unavailable',\n  message: conflict ? 'That slot was taken in the meantime. Call FindSlots again and offer new options.' : 'The backend system is unavailable. Apologise once and hand the caller to an agent (BACKEND_UNAVAILABLE).',\n  detail: String(e.message || '').slice(0, 200) } }];"
+      },
+      "id": "2e4c41d7-29f5-552d-9b1c-e1d405c86c6a",
+      "name": "ReturnCaseError",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        120
+      ]
+    }
+  ],
+  "connections": {
+    "ToolInput": {
+      "main": [
+        [
+          {
+            "node": "CallSirius",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CallSirius": {
+      "main": [
+        [
+          {
+            "node": "ShapeCase",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ReturnCaseError",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "Writes the Sirius (Salesforce) case. Inputs: op (create|update|close), correlationId, caseId, subject, classification, status, solution, delegatedReason. Returns {ok, caseId, status} or {ok:false, error}."
+  }
+}

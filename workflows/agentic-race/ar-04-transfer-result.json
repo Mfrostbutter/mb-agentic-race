@@ -1,0 +1,702 @@
+{
+  "id": "apWHiiGG9u8WFH8l",
+  "name": "AR-04 API: Transfer result",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## AR-04 Transfer result\nREFER acceptance is not completion. The outcome is stored on the session and the retry policy is one attempt.",
+        "width": 704,
+        "height": 160,
+        "color": 7
+      },
+      "id": "ebe34110-e685-506c-acdc-0c6632bbccb1",
+      "name": "Sticky1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ar/v1/session/transfer-result",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "e407da50-d97a-50c5-a43b-7740dfb191d6",
+      "name": "ReceiveTransferResult",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "25b1a758-44a0-5f9b-9ce0-38fff7eabd58",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "h4JKKkzWoDb15aGN",
+          "name": "AR gateway bearer (lab)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "r0DhjheXM3Dd6TF8"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sessionId",
+              "condition": "eq",
+              "keyValue": "={{ $json.body.sessionId }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "id": "26072ce0-0601-5655-be40-cf637745da01",
+      "name": "LoadSession",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a0cdeac7-a3fb-508d-b56c-003a4dd53375",
+              "leftValue": "={{ $json.sessionId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a6e3cc1d-34b5-58db-81ce-95806a7a0467",
+      "name": "SessionFound",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        520,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: 'not_found', message: 'unknown sessionId' }) }}",
+        "options": {
+          "responseCode": 404
+        }
+      },
+      "id": "57a5e06e-80a8-554d-af49-b4ad10d52abe",
+      "name": "RespondNotFound",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        780,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One retry, never a loop. Genesys requirement.\nconst b = $('ReceiveTransferResult').first().json.body || {};\nconst s = $json;\nconst ok = b.referAccepted !== false && /^2\\d\\d/.test(String(b.notifyStatus || ''));\nconst prior = String(s.handoffResult || '');\nconst lines = { pl: ['Chwileczkę, próbuję ponownie połączyć z konsultantem.', 'Nie udało mi się połączyć. Konsultant oddzwoni do Państwa. Do widzenia.'], es: ['Un momento, vuelvo a intentar pasarle con un agente.', 'No he podido transferirle. Un agente le devolverá la llamada. Adiós.'], de: ['Einen Moment, ich versuche die Weiterleitung noch einmal.', 'Die Weiterleitung ist fehlgeschlagen. Ein Mitarbeiter ruft Sie zurück. Auf Wiederhören.'], en: ['One moment, I am trying the transfer again.', 'I could not transfer you. A colleague will call you back. Goodbye.'] };\nconst L = lines[s.language] || lines.en;\nlet action, speak = '';\nif (ok) action = 'release';\nelse if (!prior.startsWith('failed')) { action = 'speak_and_retry_once'; speak = L[0]; }\nelse { action = 'speak_and_end'; speak = L[1]; }\nconst handoffResult = ok ? 'completed:' + (b.notifyStatus || '') : (prior.startsWith('failed') ? 'failed_final:' : 'failed:') + (b.notifyStatus || 'unknown');\nreturn [{ json: { sessionId: s.sessionId, correlationId: s.correlationId, caseId: s.caseId, action, speak, handoffResult, notifyStatus: String(b.notifyStatus || ''), state: s.state } }];"
+      },
+      "id": "a4790bb8-d640-538e-977f-d554d042401b",
+      "name": "DecideTransferAction",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "r0DhjheXM3Dd6TF8"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sessionId",
+              "condition": "eq",
+              "keyValue": "={{ $json.sessionId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "handoffResult": "={{ $json.handoffResult }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "correlationId",
+              "displayName": "correlationId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "caseId",
+              "displayName": "caseId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "market",
+              "displayName": "market",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "language",
+              "displayName": "language",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "intent",
+              "displayName": "intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "customerRef",
+              "displayName": "customerRef",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "vehicleRef",
+              "displayName": "vehicleRef",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "greetingName",
+              "displayName": "greetingName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "vehicleLabel",
+              "displayName": "vehicleLabel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "dealerId",
+              "displayName": "dealerId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "dealerName",
+              "displayName": "dealerName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "offeredSlots",
+              "displayName": "offeredSlots",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "slotId",
+              "displayName": "slotId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "bookingRef",
+              "displayName": "bookingRef",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confirmationCode",
+              "displayName": "confirmationCode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confirmationChannel",
+              "displayName": "confirmationChannel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confirmationSent",
+              "displayName": "confirmationSent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "handoffReason",
+              "displayName": "handoffReason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "handoffResult",
+              "displayName": "handoffResult",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "handoffSummary",
+              "displayName": "handoffSummary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "turns",
+              "displayName": "turns",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "startedAt",
+              "displayName": "startedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "endedAt",
+              "displayName": "endedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "endReason",
+              "displayName": "endReason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "lastLatencyMs",
+              "displayName": "lastLatencyMs",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "b8045c1e-078c-5ec2-bef8-efa4376f03da",
+      "name": "UpdateTransfer",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1040,
+        -80
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "Av23wWiyWOZ3DXuQ",
+          "mode": "list",
+          "cachedResultName": "AR-17 Log event"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "correlationId": "={{ $('DecideTransferAction').first().json.correlationId }}",
+            "sessionId": "={{ $('DecideTransferAction').first().json.sessionId }}",
+            "caseId": "={{ $('DecideTransferAction').first().json.caseId }}",
+            "workflow": "AR-04",
+            "event": "transfer_result",
+            "state": "={{ $('DecideTransferAction').first().json.state }}",
+            "tool": "",
+            "latencyMs": 0,
+            "outcome": "={{ $('DecideTransferAction').first().json.action }}",
+            "errorCode": "={{ $('DecideTransferAction').first().json.action === 'release' ? '' : 'refer_failed' }}",
+            "detail": "={{ 'notify=' + $('DecideTransferAction').first().json.notifyStatus }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "correlationId",
+              "displayName": "correlationId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "caseId",
+              "displayName": "caseId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "event",
+              "displayName": "event",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "tool",
+              "displayName": "tool",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "latencyMs",
+              "displayName": "latencyMs",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "outcome",
+              "displayName": "outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "errorCode",
+              "displayName": "errorCode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "detail",
+              "displayName": "detail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "f4c9309d-f3a1-5358-a4c4-9fd3565bd4be",
+      "name": "LogTransfer",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1300,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ action: $('DecideTransferAction').first().json.action, speak: $('DecideTransferAction').first().json.speak }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "0bd37eb2-540b-5622-a9e4-caf943c0f95e",
+      "name": "RespondTransfer",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1560,
+        -80
+      ]
+    }
+  ],
+  "connections": {
+    "ReceiveTransferResult": {
+      "main": [
+        [
+          {
+            "node": "LoadSession",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LoadSession": {
+      "main": [
+        [
+          {
+            "node": "SessionFound",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SessionFound": {
+      "main": [
+        [
+          {
+            "node": "DecideTransferAction",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RespondNotFound",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DecideTransferAction": {
+      "main": [
+        [
+          {
+            "node": "UpdateTransfer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "UpdateTransfer": {
+      "main": [
+        [
+          {
+            "node": "LogTransfer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LogTransfer": {
+      "main": [
+        [
+          {
+            "node": "RespondTransfer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "POST /webhook/ar/v1/session/transfer-result. Records the REFER NOTIFY outcome and tells the gateway what to do: release, speak and retry once, or speak and end."
+  }
+}

@@ -1,0 +1,1526 @@
+{
+  "id": "0TcmPg1VLCIhI0Ph",
+  "name": "AR-02 API: Dialogue turn",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## AR-02 Dialogue turn\nThe brain. State lives in ar_sessions; the system prompt is rebuilt every turn. Guards after the model: no booking claim without a confirmation code, no slot that was not offered, no end before WRAPUP.",
+        "width": 896,
+        "height": 160,
+        "color": 7
+      },
+      "id": "cb390c18-b5ff-5202-bece-9c74151f125f",
+      "name": "Sticky1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -448
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Tools\nFindDealers, FindSlots, BookAppointment. sessionId is plumbed, never a model parameter. Handoff is not a tool: it is a deterministic consequence of action=handoff.",
+        "width": 704,
+        "height": 160,
+        "color": 4
+      },
+      "id": "4e060b2a-fdfe-5ac7-8883-f1af42a3ac66",
+      "name": "Sticky2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1296,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ar/v1/session/turn",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "94aa46e7-fdea-542f-b328-31619ed30242",
+      "name": "ReceiveTurn",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "76a3a7b0-31aa-5352-a7a1-b8c8b9c727c6",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "h4JKKkzWoDb15aGN",
+          "name": "AR gateway bearer (lab)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $json.body || {};\nconst errors = [];\nif (!b.sessionId) errors.push('sessionId missing');\nif (typeof b.transcript !== 'string') errors.push('transcript missing');\nreturn [{ json: { valid: !errors.length, statusCode: errors.length ? 400 : 200, error: errors.length ? 'validation_error' : null, message: errors.join('; ') || null,\n  sessionId: String(b.sessionId || ''), correlationId: String(b.correlationId || ''), transcript: String(b.transcript || '').trim(), language: String(b.language || '').slice(0, 2),\n  asrConfidence: typeof b.asrConfidence === 'number' ? b.asrConfidence : null, turn: b.turn || null, startedAt: Date.now() } }];"
+      },
+      "id": "52deec64-d0a7-50eb-83c2-7ff150c0dcc0",
+      "name": "ValidateTurn",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3ff64a24-b36c-56cf-af72-292457cf580a",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0f6641e2-f5a2-5973-93fa-7f029c9e1afd",
+      "name": "IsValid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        520,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: $json.error, message: $json.message }) }}",
+        "options": {
+          "responseCode": "={{ $json.statusCode }}"
+        }
+      },
+      "id": "fc5ff697-d3b7-515a-bab5-e45123242ca9",
+      "name": "RespondInvalid",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        780,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "r0DhjheXM3Dd6TF8"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sessionId",
+              "condition": "eq",
+              "keyValue": "={{ $json.sessionId }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "id": "51e9db89-f808-5dbe-8b89-9a7221011ec8",
+      "name": "LoadSession",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        780,
+        -100
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7ce88f9e-9529-565e-a83f-c6cf29e4ab53",
+              "leftValue": "={{ $json.sessionId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "89d9c8de-af9f-5ede-98ac-06ddc5240458",
+      "name": "SessionFound",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1040,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: 'not_found', message: 'unknown sessionId' }) }}",
+        "options": {
+          "responseCode": 404
+        }
+      },
+      "id": "ba20de06-034c-505d-8193-25fa37c60f33",
+      "name": "RespondNotFound",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1300,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "RO5bFsxMBHvl1AuA"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "market",
+              "condition": "eq",
+              "keyValue": "={{ $json.market }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "id": "4ee302a5-f908-5ba9-827d-a01c6f4ec0c1",
+      "name": "LoadMarket",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1300,
+        -180
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Assembles the facts and the goal for this turn. The system prompt is rebuilt every turn from the session row, so state lives in n8n, not in the model.\nconst req = $('ValidateTurn').first().json;\nconst s = $('LoadSession').first().json;\nconst m = $('LoadMarket').first().json;\nconst lang = s.language || m.defaultLanguage || 'en';\nconst langName = ({ pl: 'Polish', es: 'Spanish', de: 'German', en: 'English' })[lang] || 'English';\nlet offered = []; try { offered = JSON.parse(s.offeredSlots || '[]'); } catch (e) { offered = []; }\nconst slotLines = offered.length ? offered.map(o => `- slotId ${o.slotId}: ${o.label} at ${o.dealerName || s.dealerName}`).join('\\n') : '(none offered yet)';\nconst lowConf = req.asrConfidence !== null && req.asrConfidence < 0.5;\nconst goals = {\n  IDENTIFY: 'Confirm you are speaking with the customer named in the facts about the vehicle named in the facts, in one short question. Never read out a VIN or a phone number. If the caller says it is not them, or no customer is known, set action handoff with handoffReason IDENTIFICATION_FAILED. When confirmed, move to CONSENT.',\n  CONSENT: 'The AI disclosure was already spoken. Ask once whether the caller is happy to continue with the assistant. Yes: move to NEED. No: set action handoff with handoffReason POLICY.',\n  NEED: 'Find out what the caller needs: a new appointment (intent BOOK), moving an existing one (RESCHEDULE), cancelling (CANCEL) or something else (OTHER, then action handoff with SCENARIO_REQUIRES_AGENT). For BOOK, collect the service type (inspection, regular service, tyre change, repair, warning light, other) and whether replacement mobility is needed, then move to DEALER.',\n  DEALER: 'Propose the preferred dealer from the facts; it can be booked here. If the caller wants a different one, ask for the city and call FindDealers. Only a dealer that FindDealers returned with dsdEnabled false cannot be booked here: then set action handoff with SCENARIO_REQUIRES_AGENT. When a dealer is agreed, move to SLOT and call FindSlots.',\n  SLOT: 'Call FindSlots for the agreed dealer and the earliest date the caller wants, then offer at most three options by day and time, never by slotId. If none fits, call FindSlots once more with a later fromDate; if still none, set action handoff with NO_SLOT. When the caller picks one, move to CONFIRM.',\n  CONFIRM: 'Read back dealer, day, time, service type and mobility, put the slotId of that option in the slotId field, and ask for an explicit yes. Booking is only possible in the turn after the read-back, once the caller has said yes: then call BookAppointment with the same slotId. If BookAppointment answers not_confirmed, read the slot back again and ask for a yes. Never say the appointment is booked before BookAppointment returns a confirmation code. After a confirmation code, move to BOOKED and read the code back.',\n  BOOKED: 'Tell the caller the confirmation code slowly, that a confirmation message will follow, ask if there is anything else. If nothing else, say goodbye with action end and state WRAPUP.',\n  WRAPUP: 'Close politely with action end.',\n  HANDOFF: 'Say a colleague will take over and set action handoff.'\n};\nconst rowState = s.state || 'IDENTIFY';\n// Deterministic yes/no gates for IDENTIFY and CONSENT, so a small model cannot loop on a confirmed question.\nconst utter = String(req.transcript || '').trim().toLowerCase();\nconst saidYes = /^(tak|zgadza|owszem|dok[łl]adnie|to ja|oczywi[śs]cie|jasne|s[íi]|claro|correcto|as[íi] es|soy yo|exacto|vale|de acuerdo|por supuesto|ja|genau|richtig|korrekt|das bin ich|stimmt|nat[üu]rlich|gerne|in ordnung|yes|yeah|yep|correct|that'?s me|that is me|sure|of course|go ahead|ok(ay)?)(?=[\\s,.!?;:]|$)/.test(utter);\nconst saidNo = /^(nie|no|nein|not me|wrong)(?=[\\s,.!?;:]|$)/.test(utter);\nlet gateAdvanced = false; let gateDecline = '';\nlet state = rowState;\nif (rowState === 'IDENTIFY' && saidYes) { state = 'CONSENT'; gateAdvanced = true; }\nif (rowState === 'CONSENT' && saidYes) { state = 'NEED'; gateAdvanced = true; }\nif (rowState === 'DEALER' && saidYes && s.dealerId) { state = 'SLOT'; gateAdvanced = true; }\nif (rowState === 'IDENTIFY' && (saidNo || !s.customerRef)) gateDecline = 'IDENTIFICATION_FAILED';\nif (rowState === 'CONSENT' && saidNo) gateDecline = 'POLICY';\nconst facts = [\n  gateAdvanced ? `The caller has just ${rowState === 'IDENTIFY' ? 'confirmed their identity' : rowState === 'CONSENT' ? 'agreed to continue with the assistant' : `agreed to the dealer ${s.dealerName} (dealerId ${s.dealerId}); call FindSlots for it now`}. Do not ask that again; follow the current goal.` : '',\n  `Session state: ${state}.`,\n  `Customer known: ${s.customerRef ? 'yes' : 'no'}.`,\n  s.greetingName ? `Name to address the customer: ${s.greetingName}.` : '',\n  s.vehicleLabel ? `Vehicle: ${s.vehicleLabel}.` : '',\n  s.dealerName ? `Preferred dealer: ${s.dealerName} (dealerId ${s.dealerId}).` : 'Preferred dealer: none on file.',\n  `Market: ${s.market}. Online booking enabled in this market: ${String(m.dsdEnabled) === 'false' ? 'no' : 'yes'}.`,\n  s.bookingRef ? `Booking already made in this call: confirmation code ${s.confirmationCode}.` : 'No booking made yet in this call.',\n  `Offered slots in this call:\\n${slotLines}`,\n  `Today is ${new Date().toISOString().slice(0, 10)} (UTC).`\n].filter(Boolean).join('\\n');\nconst systemPrompt = `You are the Mercedes-Benz service appointment assistant on a live phone call. Speak ${langName} only. Keep every reply under 45 words, one question at a time, no lists, no markdown; say numbers, dates and times the way a person would on the phone.\n\nCurrent goal (state ${state}): ${goals[state] || goals.NEED}\n\nFacts you may rely on:\n${facts}\n\nRules:\n- Never invent a dealer, a time slot, a confirmation code or any customer data. Dealers come from FindDealers, slots from FindSlots, confirmation codes from BookAppointment.\n- Never say an appointment is booked, confirmed or reserved unless BookAppointment returned a confirmation code in this call.\n- If the caller asks for a person at any point, set action handoff with handoffReason CALLER_REQUEST.\n- If you could not understand the caller twice in a row, set action handoff with handoffReason NOT_UNDERSTOOD.\n- If a tool reports it is unavailable, apologise once and set action handoff with handoffReason BACKEND_UNAVAILABLE.\n- Move the state forward only when its goal is met. Allowed states: IDENTIFY, CONSENT, NEED, DEALER, SLOT, CONFIRM, BOOKED, WRAPUP, HANDOFF.\n- Return only json matching the schema. The speak field is read aloud to the caller.${lowConf ? '\\n- The speech recogniser reported low confidence for this utterance; if it is unclear, ask the caller to repeat.' : ''}`;\nreturn [{ json: { sessionId: s.sessionId, correlationId: s.correlationId, caseId: s.caseId, market: s.market, language: lang, state, chatInput: req.transcript || '(silence)', systemPrompt, startedAt: req.startedAt, turn: (Number(s.turns) || 0) + 1, lowConf, handoverLine: m.handoverLine || '', offeredSlotIds: offered.map(o => o.slotId), pendingSlotId: s.slotId || '', gateAdvanced, gateDecline } }];"
+      },
+      "id": "ccbecd10-c93b-5ebe-ba0b-9c2760990151",
+      "name": "PrepareTurn",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.chatInput }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "={{ $json.systemPrompt }}",
+          "maxIterations": 8
+        }
+      },
+      "id": "08fe1eca-bbb6-5584-a892-34eb1d5c3594",
+      "name": "DialogueAgent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1820,
+        -180
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "qwen/qwen3-coder-30b",
+          "mode": "id"
+        },
+        "options": {
+          "baseURL": "http://host.docker.internal:1234/v1",
+          "temperature": 0
+        },
+        "responsesApiEnabled": false
+      },
+      "id": "f5dd4147-2ff1-58ae-a8d8-12a1cf07e78a",
+      "name": "DialogueModel",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1700,
+        60
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "MBlabLmStudio001",
+          "name": "LM Studio (lab)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('PrepareTurn').first().json.sessionId }}",
+        "tableName": "ar_chat_memory",
+        "contextWindowLength": 30
+      },
+      "id": "3c955e5b-1dd5-5131-9978-7986d46d9a20",
+      "name": "TurnMemory",
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.4,
+      "position": [
+        1860,
+        60
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "8qRROT7ySJEd370a",
+          "name": "AR lab Postgres (ar_lab)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"required\": [\n    \"speak\",\n    \"action\",\n    \"state\",\n    \"intent\"\n  ],\n  \"properties\": {\n    \"speak\": {\n      \"type\": \"string\",\n      \"description\": \"What is read aloud to the caller, in the session language, under 45 words\"\n    },\n    \"action\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"continue\",\n        \"handoff\",\n        \"end\"\n      ]\n    },\n    \"state\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"IDENTIFY\",\n        \"CONSENT\",\n        \"NEED\",\n        \"DEALER\",\n        \"SLOT\",\n        \"CONFIRM\",\n        \"BOOKED\",\n        \"WRAPUP\",\n        \"HANDOFF\"\n      ]\n    },\n    \"intent\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"BOOK\",\n        \"RESCHEDULE\",\n        \"CANCEL\",\n        \"OTHER\",\n        \"UNKNOWN\"\n      ]\n    },\n    \"handoffReason\": {\n      \"type\": [\n        \"string\",\n        \"null\"\n      ],\n      \"enum\": [\n        \"CALLER_REQUEST\",\n        \"SCENARIO_REQUIRES_AGENT\",\n        \"NOT_UNDERSTOOD\",\n        \"BACKEND_UNAVAILABLE\",\n        \"IDENTIFICATION_FAILED\",\n        \"NO_SLOT\",\n        \"POLICY\",\n        \"PLATFORM_ERROR\",\n        null\n      ]\n    },\n    \"slotId\": {\n      \"type\": [\n        \"string\",\n        \"null\"\n      ],\n      \"description\": \"In state CONFIRM: the slotId of the option being read back to the caller. Otherwise null.\"\n    },\n    \"confidence\": {\n      \"type\": \"number\",\n      \"minimum\": 0,\n      \"maximum\": 1\n    },\n    \"summary\": {\n      \"type\": \"string\",\n      \"description\": \"One sentence for a human agent: what the caller wants and where the conversation is\"\n    }\n  }\n}",
+        "autoFix": true
+      },
+      "id": "4036037a-ddb9-5e10-85be-5f74125e0397",
+      "name": "TurnOutputShape",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        2020,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "qwen/qwen3-coder-30b",
+          "mode": "id"
+        },
+        "options": {
+          "baseURL": "http://host.docker.internal:1234/v1",
+          "temperature": 0
+        },
+        "responsesApiEnabled": false
+      },
+      "id": "f6e52837-e6c4-5958-b5f8-32a98ce0f44f",
+      "name": "ParserFixerModel",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        2020,
+        240
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "MBlabLmStudio001",
+          "name": "LM Studio (lab)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Lists Mercedes-Benz dealers the caller can choose for the appointment. Use it when the caller wants a dealer other than the preferred one, or no preferred dealer is on file. Pass the city the caller names; leave city empty to list the market's dealers. Returns dealerId, name, city and whether online booking (dsdEnabled) is possible there.",
+        "workflowId": {
+          "__rl": true,
+          "value": "IzLPW6qfY77E57tL",
+          "mode": "list",
+          "cachedResultName": "AR-11 Tool: Find dealers"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "sessionId": "={{ $('PrepareTurn').first().json.sessionId }}",
+            "city": "={{ $fromAI('city', 'City the caller named for the dealer, as spoken, or empty for all dealers in the market', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "city",
+              "displayName": "city",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        }
+      },
+      "id": "6e92ded8-fa0f-5cfa-9d0a-3b82370960bc",
+      "name": "FindDealers",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1300,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Returns up to three free appointment slots at one dealer from a given date. Call it once a dealer is agreed, and again with a later date if the caller rejects all options. Offer the returned slots by day and time; keep their slotId for BookAppointment.",
+        "workflowId": {
+          "__rl": true,
+          "value": "JKVPMFrV5W4zbZfC",
+          "mode": "list",
+          "cachedResultName": "AR-12 Tool: Find appointment slots"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "sessionId": "={{ $('PrepareTurn').first().json.sessionId }}",
+            "dealerId": "={{ $fromAI('dealerId', 'dealerId of the agreed dealer, exactly as given in the facts or by FindDealers, for example PL-WAW-01', 'string') }}",
+            "fromDate": "={{ $fromAI('fromDate', 'Earliest acceptable date as YYYY-MM-DD, or empty for the earliest available', 'string') }}",
+            "serviceType": "={{ $fromAI('serviceType', 'Service type the caller needs: inspection, service, tyre change, repair, warning light or other', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "dealerId",
+              "displayName": "dealerId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fromDate",
+              "displayName": "fromDate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "serviceType",
+              "displayName": "serviceType",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        }
+      },
+      "id": "82cc0181-66f8-5cad-b18a-f8430198189c",
+      "name": "FindSlots",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1560,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Books one of the slots offered by FindSlots in this call. Call it only after the caller explicitly confirmed dealer, day and time. Returns the confirmation code to read back, or ok false with the reason (slot not offered, slot taken, backend unavailable).",
+        "workflowId": {
+          "__rl": true,
+          "value": "mkx9qC5vxEO7pzni",
+          "mode": "list",
+          "cachedResultName": "AR-13 Tool: Book appointment"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "sessionId": "={{ $('PrepareTurn').first().json.sessionId }}",
+            "slotId": "={{ $fromAI('slotId', 'slotId of the option the caller chose, exactly as returned by FindSlots', 'string') }}",
+            "serviceType": "={{ $fromAI('serviceType', 'Service type agreed with the caller', 'string') }}",
+            "mobility": "={{ $fromAI('mobility', 'Replacement mobility the caller asked for: none, courtesy car, pick-up, or shuttle', 'string') }}",
+            "notes": "={{ $fromAI('notes', 'Anything the dealer should know, in one sentence, or empty', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "slotId",
+              "displayName": "slotId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "serviceType",
+              "displayName": "serviceType",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "mobility",
+              "displayName": "mobility",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        }
+      },
+      "id": "af49a550-35b2-5d09-ae15-1a205dc89af8",
+      "name": "BookAppointment",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1820,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "r0DhjheXM3Dd6TF8"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sessionId",
+              "condition": "eq",
+              "keyValue": "={{ $('PrepareTurn').first().json.sessionId }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "id": "6540a9fe-9f61-5b7b-a25c-85ffb7d940ca",
+      "name": "ReloadSession",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2340,
+        -260
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Deterministic guards on the model's structured output. Runs after the session was re-read, so a booking made by a tool in this turn is visible.\nconst prep = $('PrepareTurn').first().json;\nconst agent = $('DialogueAgent').first().json;\nconst s = $json;\nlet out = agent.output;\nif (typeof out === 'string') { try { out = JSON.parse(out); } catch (e) { out = { speak: out }; } }\nout = out || {};\nconst states = ['IDENTIFY','CONSENT','NEED','DEALER','SLOT','CONFIRM','BOOKED','WRAPUP','HANDOFF'];\nconst intents = ['BOOK','RESCHEDULE','CANCEL','OTHER','UNKNOWN'];\nconst reasons = ['CALLER_REQUEST','SCENARIO_REQUIRES_AGENT','NOT_UNDERSTOOD','BACKEND_UNAVAILABLE','IDENTIFICATION_FAILED','NO_SLOT','POLICY','PLATFORM_ERROR'];\nconst L = prep.language;\nconst t = (o) => o[L] || o.en;\nconst guards = [];\nlet speak = String(out.speak || '').trim();\nlet action = ['continue','handoff','end'].includes(out.action) ? out.action : 'continue';\nlet state = states.includes(out.state) ? out.state : prep.state;\nlet intent = intents.includes(out.intent) ? out.intent : 'UNKNOWN';\nlet handoffReason = reasons.includes(out.handoffReason) ? out.handoffReason : null;\nconst booked = !!s.bookingRef;\nif (prep.gateDecline && !booked && action !== 'handoff') { action = 'handoff'; handoffReason = prep.gateDecline; guards.push('gate_decline'); }\nif (prep.gateAdvanced && action === 'continue' && states.indexOf(state) < states.indexOf(prep.state)) { state = prep.state; guards.push('gate_advance'); }\nif (prep.gateAdvanced && action === 'handoff' && handoffReason === 'SCENARIO_REQUIRES_AGENT') { action = 'continue'; state = prep.state; handoffReason = null; speak = ''; guards.push('scenario_downgrade'); }\nconst asksForHuman = /(\\b(agent|human|person|operator|someone real|real person)\\b|konsultant|cz[łl]owiek|pracownik|doradc|persona|humano|agente|operador|mitarbeiter|mensch|berater|echte person)/i.test(prep.chatInput || '') && !/\\b(no|nie|nein|not|kein)\\b[^.]{0,12}(agent|human|person|konsultant|persona|mitarbeiter)/i.test(prep.chatInput || '');\nif (asksForHuman && action !== 'handoff' && !booked) { action = 'handoff'; handoffReason = 'CALLER_REQUEST'; guards.push('caller_request_rule'); }\nlet pendingSlotId = prep.pendingSlotId || '';\nconst offeredIds = prep.offeredSlotIds || [];\nif (state === 'CONFIRM' && out.slotId && offeredIds.includes(String(out.slotId))) { pendingSlotId = String(out.slotId); guards.push('pending_slot_set'); }\nif (state !== 'CONFIRM' && !booked) pendingSlotId = '';\nconst claimsBooking = /((is|has been|was|are|'s) (now |all )?(booked|confirmed|reserved|scheduled)|confirmation code|zosta[łl][ao]? (zarezerwowan|potwierdzon|umówion)|kod potwierdzenia|(ha sido|está|queda) (reservad|confirmad)|código de confirmación|(ist|wurde) (gebucht|bestätigt|reserviert)|bestätigungscode)/i.test(speak);\nif (claimsBooking && !booked) {\n  guards.push('false_confirmation');\n  speak = t({ pl: 'Jeszcze nie zarezerwowałem terminu. Czy mam go teraz zarezerwować?', es: 'Todavía no he reservado la cita. ¿Quiere que la reserve ahora?', de: 'Ich habe den Termin noch nicht gebucht. Soll ich ihn jetzt buchen?', en: 'I have not booked the appointment yet. Shall I book it now?' });\n  if (state === 'BOOKED' || state === 'WRAPUP') state = 'CONFIRM';\n  if (action === 'end') action = 'continue';\n}\nif (booked && !['BOOKED','WRAPUP','HANDOFF'].includes(state)) { state = 'BOOKED'; guards.push('state_forced_booked'); }\nif (!speak) { guards.push('empty_reply'); speak = t({ pl: 'Przepraszam, czy mogą Państwo powtórzyć?', es: 'Disculpe, ¿puede repetirlo?', de: 'Entschuldigung, können Sie das wiederholen?', en: 'Sorry, could you repeat that?' }); }\nif (speak.length > 400) { guards.push('reply_truncated'); speak = speak.slice(0, 397) + '...'; }\nif (action === 'handoff') { state = 'HANDOFF'; if (!handoffReason) { handoffReason = 'CALLER_REQUEST'; guards.push('reason_defaulted'); } if (prep.handoverLine) { speak = prep.handoverLine; guards.push('handover_line'); } }\nif (state === 'HANDOFF' && action !== 'handoff') { action = 'handoff'; handoffReason = handoffReason || 'SCENARIO_REQUIRES_AGENT'; guards.push('action_forced_handoff'); if (prep.handoverLine) speak = prep.handoverLine; }\nif (action === 'end' && !['BOOKED','WRAPUP'].includes(state)) { guards.push('end_blocked'); action = 'continue'; }\nif (action === 'end') state = 'WRAPUP';\nreturn [{ json: { sessionId: prep.sessionId, correlationId: prep.correlationId, caseId: prep.caseId, language: L, speak, action, state, intent, handoffReason, summary: String(out.summary || '').slice(0, 500),\n  confidence: typeof out.confidence === 'number' ? out.confidence : null, guards, needsHandoff: action === 'handoff', turn: prep.turn, startedAt: prep.startedAt, bookingRef: s.bookingRef || '', confirmationCode: s.confirmationCode || '', pendingSlotId, errorCode: guards.length ? guards.join(',') : '' } }];"
+      },
+      "id": "f79085d8-a993-5e90-91a0-165ac14cb438",
+      "name": "ApplyGuards",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2600,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// The agent threw (model down, parser gave up). Deterministic apology and a PLATFORM_ERROR handoff; no model involved.\nconst prep = $('PrepareTurn').first().json;\nconst err = $json.error || {};\nconst lines = { pl: 'Przepraszam, mam problem techniczny. Połączę Państwa z konsultantem.', es: 'Disculpe, tengo un problema técnico. Le paso con un agente.', de: 'Entschuldigung, ich habe ein technisches Problem. Ich verbinde Sie mit einem Mitarbeiter.', en: 'Sorry, I have a technical problem. I will connect you to a colleague.' };\nreturn [{ json: { sessionId: prep.sessionId, correlationId: prep.correlationId, caseId: prep.caseId, language: prep.language, speak: lines[prep.language] || lines.en, action: 'handoff', state: 'HANDOFF', intent: 'UNKNOWN', handoffReason: 'PLATFORM_ERROR',\n  summary: 'Dialogue agent failed: ' + String(err.message || err.description || 'unknown').slice(0, 200), confidence: null, guards: ['agent_error'], needsHandoff: true, turn: prep.turn, startedAt: prep.startedAt, bookingRef: '', confirmationCode: '', pendingSlotId: '', errorCode: 'agent_error' } }];"
+      },
+      "id": "d009d306-83bd-53bc-bbc5-230486c72f59",
+      "name": "HandleAgentError",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2340,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "42c052f6-a880-5660-8bb3-141e7fa07642",
+              "leftValue": "={{ $json.needsHandoff }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9542c05a-9445-5818-b6f2-fcbef3079000",
+      "name": "NeedsHandoff",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2860,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "k26CAA27wzDekrrF",
+          "mode": "list",
+          "cachedResultName": "AR-14 Build Genesys handoff context"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "sessionId": "={{ $json.sessionId }}",
+            "intent": "={{ $json.intent }}",
+            "handoffReason": "={{ $json.handoffReason }}",
+            "summary": "={{ $json.summary }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "intent",
+              "displayName": "intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "handoffReason",
+              "displayName": "handoffReason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "3dec7d59-9f7d-54ce-92b1-52d20312fb71",
+      "name": "BuildHandoff",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        3120,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Final response for session/turn (section 4.2 of the spec).\nlet g = null;\ntry { g = $('ApplyGuards').first().json; } catch (e) { g = null; }\nif (!g || !g.sessionId) { try { g = $('HandleAgentError').first().json; } catch (e) { g = null; } }\nif (!g) throw new Error('no guard output available');\nlet handoff = null;\nif (g.needsHandoff) {\n  try {\n    const h = $('BuildHandoff').first().json;\n    handoff = h.ok ? { intent: g.intent, handoffReason: g.handoffReason, caseId: g.caseId, uuiPayload: h.uuiPayload, uuiHex: h.uuiHex, uuiAscii: h.uuiAscii, referTo: h.referTo, truncated: h.truncated, summary: g.summary }\n                   : { intent: g.intent, handoffReason: g.handoffReason, caseId: g.caseId, error: h.error || 'handoff_build_failed' };\n  } catch (e) { handoff = { intent: g.intent, handoffReason: g.handoffReason, caseId: g.caseId, error: 'handoff_build_failed' }; }\n}\nconst latencyMs = Date.now() - Number(g.startedAt);\nconst response = { sessionId: g.sessionId, correlationId: g.correlationId, speak: g.speak, action: g.action, state: g.state, intent: g.intent, handoff, endReason: g.action === 'end' ? 'completed' : null, latencyMs, turn: g.turn, guards: g.guards };\nreturn [{ json: { ...g, response, latencyMs } }];"
+      },
+      "id": "764ab239-fc87-53dc-8543-b94c81637244",
+      "name": "ComposeResponse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3380,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "r0DhjheXM3Dd6TF8"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sessionId",
+              "condition": "eq",
+              "keyValue": "={{ $json.sessionId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "state": "={{ $json.state }}",
+            "intent": "={{ $json.intent }}",
+            "turns": "={{ $json.turn }}",
+            "lastLatencyMs": "={{ $json.latencyMs }}",
+            "slotId": "={{ $json.bookingRef ? undefined : ($json.pendingSlotId || '') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "correlationId",
+              "displayName": "correlationId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "caseId",
+              "displayName": "caseId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "market",
+              "displayName": "market",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "language",
+              "displayName": "language",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "intent",
+              "displayName": "intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "customerRef",
+              "displayName": "customerRef",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "vehicleRef",
+              "displayName": "vehicleRef",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "greetingName",
+              "displayName": "greetingName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "vehicleLabel",
+              "displayName": "vehicleLabel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "dealerId",
+              "displayName": "dealerId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "dealerName",
+              "displayName": "dealerName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "offeredSlots",
+              "displayName": "offeredSlots",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "slotId",
+              "displayName": "slotId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "bookingRef",
+              "displayName": "bookingRef",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confirmationCode",
+              "displayName": "confirmationCode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confirmationChannel",
+              "displayName": "confirmationChannel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confirmationSent",
+              "displayName": "confirmationSent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "handoffReason",
+              "displayName": "handoffReason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "handoffResult",
+              "displayName": "handoffResult",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "handoffSummary",
+              "displayName": "handoffSummary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "turns",
+              "displayName": "turns",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "startedAt",
+              "displayName": "startedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "endedAt",
+              "displayName": "endedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "endReason",
+              "displayName": "endReason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "lastLatencyMs",
+              "displayName": "lastLatencyMs",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "d8bb6a47-f285-56b3-a808-d5ba383e96e7",
+      "name": "UpdateSession",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3640,
+        -260
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "Av23wWiyWOZ3DXuQ",
+          "mode": "list",
+          "cachedResultName": "AR-17 Log event"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "correlationId": "={{ $('ComposeResponse').first().json.correlationId }}",
+            "sessionId": "={{ $('ComposeResponse').first().json.sessionId }}",
+            "caseId": "={{ $('ComposeResponse').first().json.caseId }}",
+            "workflow": "AR-02",
+            "event": "turn",
+            "state": "={{ $('ComposeResponse').first().json.state }}",
+            "tool": "",
+            "latencyMs": "={{ $('ComposeResponse').first().json.latencyMs }}",
+            "outcome": "={{ $('ComposeResponse').first().json.action }}",
+            "errorCode": "={{ $('ComposeResponse').first().json.errorCode || '' }}",
+            "detail": "={{ 'turn=' + $('ComposeResponse').first().json.turn + ' intent=' + $('ComposeResponse').first().json.intent + ($('ComposeResponse').first().json.handoffReason ? ' reason=' + $('ComposeResponse').first().json.handoffReason : '') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "correlationId",
+              "displayName": "correlationId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "caseId",
+              "displayName": "caseId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "event",
+              "displayName": "event",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "tool",
+              "displayName": "tool",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "latencyMs",
+              "displayName": "latencyMs",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "outcome",
+              "displayName": "outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "errorCode",
+              "displayName": "errorCode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "detail",
+              "displayName": "detail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "5cbae092-0dff-561c-b192-d94de9fe90ab",
+      "name": "LogTurn",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        3900,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($('ComposeResponse').first().json.response) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "9212a1a3-d762-5e0e-a19a-ca667071ad75",
+      "name": "RespondTurn",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        4160,
+        -260
+      ]
+    }
+  ],
+  "connections": {
+    "FindDealers": {
+      "ai_tool": [
+        [
+          {
+            "node": "DialogueAgent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FindSlots": {
+      "ai_tool": [
+        [
+          {
+            "node": "DialogueAgent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BookAppointment": {
+      "ai_tool": [
+        [
+          {
+            "node": "DialogueAgent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DialogueModel": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "DialogueAgent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TurnMemory": {
+      "ai_memory": [
+        [
+          {
+            "node": "DialogueAgent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TurnOutputShape": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "DialogueAgent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ParserFixerModel": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "TurnOutputShape",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReceiveTurn": {
+      "main": [
+        [
+          {
+            "node": "ValidateTurn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ValidateTurn": {
+      "main": [
+        [
+          {
+            "node": "IsValid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IsValid": {
+      "main": [
+        [
+          {
+            "node": "LoadSession",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RespondInvalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LoadSession": {
+      "main": [
+        [
+          {
+            "node": "SessionFound",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SessionFound": {
+      "main": [
+        [
+          {
+            "node": "LoadMarket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RespondNotFound",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LoadMarket": {
+      "main": [
+        [
+          {
+            "node": "PrepareTurn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PrepareTurn": {
+      "main": [
+        [
+          {
+            "node": "DialogueAgent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DialogueAgent": {
+      "main": [
+        [
+          {
+            "node": "ReloadSession",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HandleAgentError",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReloadSession": {
+      "main": [
+        [
+          {
+            "node": "ApplyGuards",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ApplyGuards": {
+      "main": [
+        [
+          {
+            "node": "NeedsHandoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NeedsHandoff": {
+      "main": [
+        [
+          {
+            "node": "BuildHandoff",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ComposeResponse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HandleAgentError": {
+      "main": [
+        [
+          {
+            "node": "BuildHandoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BuildHandoff": {
+      "main": [
+        [
+          {
+            "node": "ComposeResponse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ComposeResponse": {
+      "main": [
+        [
+          {
+            "node": "UpdateSession",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "UpdateSession": {
+      "main": [
+        [
+          {
+            "node": "LogTurn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LogTurn": {
+      "main": [
+        [
+          {
+            "node": "RespondTurn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "POST /webhook/ar/v1/session/turn. One call per caller utterance. Loads the session, runs the dialogue agent with its three tools, applies deterministic guards, builds the handoff context when needed, updates the session and logs. Returns speak, action, state and handoff."
+  }
+}

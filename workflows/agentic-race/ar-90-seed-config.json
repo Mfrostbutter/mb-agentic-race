@@ -1,0 +1,444 @@
+{
+  "id": "ALHGUA9iC72WQfiQ",
+  "name": "AR-90 Seed configuration tables",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## AR-90 Seed config\nMarkets and codes are data, not prompt text: a new market is one row here. Disclosure texts are placeholders until MB Legal supplies the market wording.",
+        "width": 768,
+        "height": 160,
+        "color": 7
+      },
+      "id": "93b85b8c-71c3-5358-91b4-a32255cc3342",
+      "name": "Sticky1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ar/v1/admin/seed",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "4245865e-d830-5e55-8ff1-ca1b34c02750",
+      "name": "ReceiveSeed",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "b9b82209-b844-5a11-94f2-b29e0fb46c1f",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "h4JKKkzWoDb15aGN",
+          "name": "AR gateway bearer (lab)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = [{\"market\": \"PL\", \"languages\": \"pl,en\", \"defaultLanguage\": \"pl\", \"dsdEnabled\": true, \"disclosure_pl\": \"Dzień dobry, tu asystent cyfrowy Mercedes-Benz. Ta rozmowa jest prowadzona przez sztuczną inteligencję. W każdej chwili mogą Państwo poprosić o rozmowę z konsultantem.\", \"disclosure_es\": \"\", \"disclosure_en\": \"Hello, this is the Mercedes-Benz digital assistant. This conversation is handled by an artificial intelligence. You can ask for a human colleague at any time.\", \"disclosure_de\": \"\", \"handoverLine\": \"Łączę Państwa z konsultantem, proszę chwilę poczekać.\", \"closingLine\": \"Dziękuję za rozmowę. Do widzenia.\", \"confirmationChannels\": \"sms,email\", \"returnNumber\": \"sip:111102@byoc.euc1.genesys.example\", \"slotWindowDays\": 14, \"maxSlotsOffered\": 3}, {\"market\": \"ES\", \"languages\": \"es,en\", \"defaultLanguage\": \"es\", \"dsdEnabled\": true, \"disclosure_pl\": \"\", \"disclosure_es\": \"Hola, le atiende el asistente digital de Mercedes-Benz. Esta conversación la gestiona una inteligencia artificial. Puede pedir hablar con una persona en cualquier momento.\", \"disclosure_en\": \"Hello, this is the Mercedes-Benz digital assistant. This conversation is handled by an artificial intelligence. You can ask for a human colleague at any time.\", \"disclosure_de\": \"\", \"handoverLine\": \"Le paso con un agente, un momento por favor.\", \"closingLine\": \"Gracias por su llamada. Adiós.\", \"confirmationChannels\": \"sms,email\", \"returnNumber\": \"sip:111102@byoc.euc1.genesys.example\", \"slotWindowDays\": 14, \"maxSlotsOffered\": 3}, {\"market\": \"DE\", \"languages\": \"de,en\", \"defaultLanguage\": \"de\", \"dsdEnabled\": true, \"disclosure_pl\": \"\", \"disclosure_es\": \"\", \"disclosure_en\": \"Hello, this is the Mercedes-Benz digital assistant. This conversation is handled by an artificial intelligence. You can ask for a human colleague at any time.\", \"disclosure_de\": \"Guten Tag, hier ist der digitale Assistent von Mercedes-Benz. Dieses Gespräch wird von einer künstlichen Intelligenz geführt. Sie können jederzeit einen Mitarbeiter verlangen.\", \"handoverLine\": \"Ich verbinde Sie mit einem Mitarbeiter, einen Moment bitte.\", \"closingLine\": \"Vielen Dank für Ihren Anruf. Auf Wiederhören.\", \"confirmationChannels\": \"sms,email\", \"returnNumber\": \"sip:111102@byoc.euc1.genesys.example\", \"slotWindowDays\": 14, \"maxSlotsOffered\": 3}, {\"market\": \"GB\", \"languages\": \"en\", \"defaultLanguage\": \"en\", \"dsdEnabled\": true, \"disclosure_pl\": \"\", \"disclosure_es\": \"\", \"disclosure_en\": \"Hello, this is the Mercedes-Benz digital assistant. This conversation is handled by an artificial intelligence. You can ask for a human colleague at any time.\", \"disclosure_de\": \"\", \"handoverLine\": \"I am connecting you to a colleague, one moment please.\", \"closingLine\": \"Thank you for calling. Goodbye.\", \"confirmationChannels\": \"sms,email\", \"returnNumber\": \"sip:111102@byoc.euw2.genesys.example\", \"slotWindowDays\": 14, \"maxSlotsOffered\": 3}];\nreturn rows.map(r => ({ json: r }));"
+      },
+      "id": "dea035fd-18dc-5cdd-8e7e-2e1b5f71d089",
+      "name": "MarketRows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "RO5bFsxMBHvl1AuA"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "market",
+              "condition": "eq",
+              "keyValue": "={{ $json.market }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "market": "={{ $json.market }}",
+            "languages": "={{ $json.languages }}",
+            "defaultLanguage": "={{ $json.defaultLanguage }}",
+            "dsdEnabled": "={{ $json.dsdEnabled }}",
+            "disclosure_pl": "={{ $json.disclosure_pl }}",
+            "disclosure_es": "={{ $json.disclosure_es }}",
+            "disclosure_en": "={{ $json.disclosure_en }}",
+            "disclosure_de": "={{ $json.disclosure_de }}",
+            "handoverLine": "={{ $json.handoverLine }}",
+            "closingLine": "={{ $json.closingLine }}",
+            "confirmationChannels": "={{ $json.confirmationChannels }}",
+            "returnNumber": "={{ $json.returnNumber }}",
+            "slotWindowDays": "={{ $json.slotWindowDays }}",
+            "maxSlotsOffered": "={{ $json.maxSlotsOffered }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "market",
+              "displayName": "market",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "languages",
+              "displayName": "languages",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "defaultLanguage",
+              "displayName": "defaultLanguage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "dsdEnabled",
+              "displayName": "dsdEnabled",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "disclosure_pl",
+              "displayName": "disclosure_pl",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "disclosure_es",
+              "displayName": "disclosure_es",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "disclosure_en",
+              "displayName": "disclosure_en",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "disclosure_de",
+              "displayName": "disclosure_de",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "handoverLine",
+              "displayName": "handoverLine",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "closingLine",
+              "displayName": "closingLine",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confirmationChannels",
+              "displayName": "confirmationChannels",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "returnNumber",
+              "displayName": "returnNumber",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "slotWindowDays",
+              "displayName": "slotWindowDays",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "maxSlotsOffered",
+              "displayName": "maxSlotsOffered",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "7de470d2-7976-52bb-905d-b04475d642ef",
+      "name": "UpsertMarket",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        520,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = [{\"kind\": \"intent\", \"code\": \"BOOK\", \"short\": \"B\", \"genesysValue\": \"APPT_BOOK\", \"description\": \"New service appointment\"}, {\"kind\": \"intent\", \"code\": \"RESCHEDULE\", \"short\": \"R\", \"genesysValue\": \"APPT_RESCHEDULE\", \"description\": \"Move an existing appointment\"}, {\"kind\": \"intent\", \"code\": \"CANCEL\", \"short\": \"C\", \"genesysValue\": \"APPT_CANCEL\", \"description\": \"Cancel an existing appointment\"}, {\"kind\": \"intent\", \"code\": \"OTHER\", \"short\": \"O\", \"genesysValue\": \"OTHER\", \"description\": \"Outside appointment booking\"}, {\"kind\": \"intent\", \"code\": \"UNKNOWN\", \"short\": \"U\", \"genesysValue\": \"unknown\", \"description\": \"Intent not identified\"}, {\"kind\": \"reason\", \"code\": \"CALLER_REQUEST\", \"short\": \"CR\", \"genesysValue\": \"CUSTOMER_REQUEST\", \"description\": \"Caller asked for a person\"}, {\"kind\": \"reason\", \"code\": \"SCENARIO_REQUIRES_AGENT\", \"short\": \"SA\", \"genesysValue\": \"PROCESS\", \"description\": \"Non-DSD dealer, callback or out-of-scope request\"}, {\"kind\": \"reason\", \"code\": \"NOT_UNDERSTOOD\", \"short\": \"NU\", \"genesysValue\": \"LOW_CONFIDENCE\", \"description\": \"Two consecutive turns not understood\"}, {\"kind\": \"reason\", \"code\": \"BACKEND_UNAVAILABLE\", \"short\": \"BU\", \"genesysValue\": \"SYSTEM_ERROR\", \"description\": \"CRM, DSD or case system unavailable\"}, {\"kind\": \"reason\", \"code\": \"IDENTIFICATION_FAILED\", \"short\": \"IF\", \"genesysValue\": \"IDENTIFICATION\", \"description\": \"Customer or vehicle could not be confirmed\"}, {\"kind\": \"reason\", \"code\": \"NO_SLOT\", \"short\": \"NS\", \"genesysValue\": \"NO_AVAILABILITY\", \"description\": \"No acceptable slot found\"}, {\"kind\": \"reason\", \"code\": \"POLICY\", \"short\": \"PO\", \"genesysValue\": \"CONSENT\", \"description\": \"Caller declined the assistant or a policy trigger fired\"}, {\"kind\": \"reason\", \"code\": \"PLATFORM_ERROR\", \"short\": \"PE\", \"genesysValue\": \"SYSTEM_ERROR\", \"description\": \"Dialogue platform failure\"}];\nreturn rows.map(r => ({ json: r }));"
+      },
+      "id": "6e7f3cca-6b2d-59f1-afac-f4556d27e3ab",
+      "name": "CodeRows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "LDtGpqD8zN10CE3A"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "kind",
+              "condition": "eq",
+              "keyValue": "={{ $json.kind }}"
+            },
+            {
+              "keyName": "code",
+              "condition": "eq",
+              "keyValue": "={{ $json.code }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "kind": "={{ $json.kind }}",
+            "code": "={{ $json.code }}",
+            "short": "={{ $json.short }}",
+            "genesysValue": "={{ $json.genesysValue }}",
+            "description": "={{ $json.description }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "kind",
+              "displayName": "kind",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "code",
+              "displayName": "code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "short",
+              "displayName": "short",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "genesysValue",
+              "displayName": "genesysValue",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "description",
+              "displayName": "description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "844b5c4a-a13e-55d9-adf2-4da0afbf5f7a",
+      "name": "UpsertCode",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1040,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, markets: 4, codes: 13 }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "1067f59d-d1ac-5c49-ab7e-3e28b2610d7d",
+      "name": "RespondSeeded",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1300,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "ReceiveSeed": {
+      "main": [
+        [
+          {
+            "node": "MarketRows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MarketRows": {
+      "main": [
+        [
+          {
+            "node": "UpsertMarket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "UpsertMarket": {
+      "main": [
+        [
+          {
+            "node": "CodeRows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CodeRows": {
+      "main": [
+        [
+          {
+            "node": "UpsertCode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "UpsertCode": {
+      "main": [
+        [
+          {
+            "node": "RespondSeeded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "POST /webhook/ar/v1/admin/seed. Upserts ar_markets (PL, ES, DE, GB) and ar_codes (intent and handoff reason codes). Run once per environment; safe to re-run."
+  }
+}

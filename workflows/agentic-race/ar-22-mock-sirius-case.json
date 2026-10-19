@@ -1,0 +1,248 @@
+{
+  "id": "MWbBPJph9sAwvMUG",
+  "name": "AR-MOCK-SIRIUS Salesforce case",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Mock Sirius (Salesforce) case\nOne endpoint, op in the body. Case numbers are deterministic from the correlation ID, so a re-created case is the same case.",
+        "width": 704,
+        "height": 160,
+        "color": 7
+      },
+      "id": "eddd14a4-6f43-58f1-9026-6c731028bc90",
+      "name": "Sticky1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ar-mock/sirius/case",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "2007b0fc-b98f-5d1b-8bc4-7110d5f1b4fe",
+      "name": "ReceiveCaseOp",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "85166ca0-f377-5567-947b-7e734e8e236e"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mock of the Sirius (Salesforce) case API. Real build: Salesforce REST with OAuth2 client credentials.\nconst b = $json.body || {};\nconst op = b.op || 'create';\nlet caseId = b.caseId || '';\nif (op === 'create' || !caseId) {\n  let h = 0; for (const ch of String(b.correlationId || Date.now())) h = (h * 33 + ch.charCodeAt(0)) >>> 0;\n  caseId = 'CS-' + (10000000 + (h % 90000000)).toString();\n}\nconst now = new Date().toISOString();\nreturn [{ json: { caseId, correlationId: b.correlationId || '', status: b.status || (op === 'create' ? 'In Progress' : 'Closed'),\n  subject: b.subject || 'Appointment booking via voice assistant', classification: b.classification || 'Appointment Booking',\n  solution: b.solution || '', delegatedReason: b.delegatedReason || '', openedAt: op === 'create' ? now : (b.openedAt || ''), lastUpdate: now, op } }];"
+      },
+      "id": "a4c818cd-8612-5c80-9ca7-6fe0a60d982e",
+      "name": "ComputeCase",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "pIg8JFEWpT5eb5mT"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "caseId",
+              "condition": "eq",
+              "keyValue": "={{ $json.caseId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "caseId": "={{ $json.caseId }}",
+            "correlationId": "={{ $json.correlationId }}",
+            "status": "={{ $json.status }}",
+            "subject": "={{ $json.subject }}",
+            "classification": "={{ $json.classification }}",
+            "solution": "={{ $json.solution }}",
+            "delegatedReason": "={{ $json.delegatedReason }}",
+            "openedAt": "={{ $json.op === 'create' ? $json.openedAt : undefined }}",
+            "lastUpdate": "={{ $json.lastUpdate }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "caseId",
+              "displayName": "caseId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "correlationId",
+              "displayName": "correlationId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "classification",
+              "displayName": "classification",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "solution",
+              "displayName": "solution",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "delegatedReason",
+              "displayName": "delegatedReason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "openedAt",
+              "displayName": "openedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "lastUpdate",
+              "displayName": "lastUpdate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "7847adfd-7ecc-5c8d-bce5-725aad06b725",
+      "name": "UpsertCase",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        520,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($('ComputeCase').first().json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "1e2daed0-4f0e-57ce-9622-e69894ab25b1",
+      "name": "RespondCase",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        780,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "ReceiveCaseOp": {
+      "main": [
+        [
+          {
+            "node": "ComputeCase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ComputeCase": {
+      "main": [
+        [
+          {
+            "node": "UpsertCase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "UpsertCase": {
+      "main": [
+        [
+          {
+            "node": "RespondCase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "Lab stand-in for the Sirius case API. POST ar-mock/sirius/case {op: create|update|close, correlationId, caseId, ...} -> case. Persists in ar_mock_cases."
+  }
+}

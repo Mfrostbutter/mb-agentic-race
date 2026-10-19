@@ -1,0 +1,1116 @@
+{
+  "id": "rJ36ojhIJvP9D40A",
+  "name": "AR-03 API: Session end",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## AR-03 Session end\nCase outcome from the session state. Chat memory for the session is deleted here: no transcript survives the call.",
+        "width": 768,
+        "height": 160,
+        "color": 7
+      },
+      "id": "23c806af-13a0-50af-bf8a-a5ab44f79788",
+      "name": "Sticky1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ar/v1/session/end",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "cc6d7bcd-a16f-5a4b-82d2-34dbade5a203",
+      "name": "ReceiveEnd",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "ab2a8c67-7926-5031-b128-d691d71982e5",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "h4JKKkzWoDb15aGN",
+          "name": "AR gateway bearer (lab)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $json.body || {};\nconst ok = !!b.sessionId;\nreturn [{ json: { valid: ok, statusCode: ok ? 200 : 400, error: ok ? null : 'validation_error', message: ok ? null : 'sessionId missing', sessionId: String(b.sessionId || ''), endReason: String(b.endReason || 'completed'), durationMs: Number(b.durationMs) || 0, startedAt: Date.now() } }];"
+      },
+      "id": "04b0045f-6761-563e-8522-a6edbd4d9b79",
+      "name": "ValidateEnd",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "119a36f5-c6c0-573f-a7e7-a456b7915d6c",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b8b43131-d0e8-530a-a920-d40af9a62527",
+      "name": "IsValid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        520,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: $json.error, message: $json.message }) }}",
+        "options": {
+          "responseCode": "={{ $json.statusCode }}"
+        }
+      },
+      "id": "f1096b00-d8ab-5631-ae5a-9ee046e0c4bf",
+      "name": "RespondInvalid",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        780,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "r0DhjheXM3Dd6TF8"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sessionId",
+              "condition": "eq",
+              "keyValue": "={{ $json.sessionId }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "id": "f6bffeea-bed7-5414-95f6-3e7b124ac218",
+      "name": "LoadSession",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        780,
+        -100
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "80f8ca39-85af-5548-a332-48e9aabdc8b6",
+              "leftValue": "={{ $json.sessionId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e7b6d620-d2a7-5283-969b-dc8e7eb68e4a",
+      "name": "SessionFound",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1040,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: 'not_found', message: 'unknown sessionId' }) }}",
+        "options": {
+          "responseCode": 404
+        }
+      },
+      "id": "08b22af8-d1ed-5dd1-87f2-9cca39cab3d5",
+      "name": "RespondNotFound",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1300,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Decides the case outcome and whether a confirmation is still owed.\nconst req = $('ValidateEnd').first().json;\nconst s = $json;\nconst booked = !!s.bookingRef;\nlet caseStatus, solution = '', delegatedReason = '';\nif (booked) { caseStatus = 'Resolved'; solution = `Appointment booked via voice assistant. Confirmation code ${s.confirmationCode}. Dealer ${s.dealerName || s.dealerId}. Slot ${s.slotId}.`; }\nelse if (s.state === 'HANDOFF' || String(req.endReason).startsWith('handoff')) { caseStatus = 'Delegated'; delegatedReason = `Handed to agent: ${s.handoffReason || 'unknown'}. ${s.handoffSummary || ''}`.trim(); }\nelse { caseStatus = 'Closed'; solution = `Call ended without booking (${req.endReason}) in state ${s.state}.`; }\nconst needsConfirmation = booked && String(s.confirmationSent) !== 'true';\nconst texts = { pl: `Mercedes-Benz: wizyta serwisowa potwierdzona. Kod ${s.confirmationCode}, ${s.dealerName}, termin ${s.slotId}.`, es: `Mercedes-Benz: cita de taller confirmada. Código ${s.confirmationCode}, ${s.dealerName}, cita ${s.slotId}.`, de: `Mercedes-Benz: Werkstatttermin bestätigt. Code ${s.confirmationCode}, ${s.dealerName}, Termin ${s.slotId}.`, en: `Mercedes-Benz: service appointment confirmed. Code ${s.confirmationCode}, ${s.dealerName}, slot ${s.slotId}.` };\nreturn [{ json: { sessionId: s.sessionId, correlationId: s.correlationId, caseId: s.caseId, caseStatus, solution, delegatedReason, needsConfirmation, booked, language: s.language, customerRef: s.customerRef, confirmationChannel: s.confirmationChannel || 'sms', confirmationText: texts[s.language] || texts.en, endReason: req.endReason, state: s.state, durationMs: req.durationMs } }];"
+      },
+      "id": "0142b3de-f320-5ec5-9e4b-8b669f9aaf30",
+      "name": "DecideOutcome",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "MVSHEW6jOTk7LGM1",
+          "mode": "list",
+          "cachedResultName": "AR-15 Sirius case create, update or close"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "op": "close",
+            "correlationId": "={{ $json.correlationId }}",
+            "caseId": "={{ $json.caseId }}",
+            "subject": "",
+            "classification": "",
+            "status": "={{ $json.caseStatus }}",
+            "solution": "={{ $json.solution }}",
+            "delegatedReason": "={{ $json.delegatedReason }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "op",
+              "displayName": "op",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "correlationId",
+              "displayName": "correlationId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "caseId",
+              "displayName": "caseId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "classification",
+              "displayName": "classification",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "solution",
+              "displayName": "solution",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "delegatedReason",
+              "displayName": "delegatedReason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "b86f0b48-8fbd-5205-827f-d4531765ed47",
+      "name": "CloseCase",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1560,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7f424e25-4574-53f3-abd5-a97991622af1",
+              "leftValue": "={{ $('DecideOutcome').first().json.needsConfirmation }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d49df62a-b068-59a7-b627-55e3b3abd75d",
+      "name": "NeedsConfirmation",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1820,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "VcBMopVaTPjanXph",
+          "mode": "list",
+          "cachedResultName": "AR-16 Send booking confirmation"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "channel": "={{ $('DecideOutcome').first().json.confirmationChannel }}",
+            "customerRef": "={{ $('DecideOutcome').first().json.customerRef }}",
+            "language": "={{ $('DecideOutcome').first().json.language }}",
+            "text": "={{ $('DecideOutcome').first().json.confirmationText }}",
+            "correlationId": "={{ $('DecideOutcome').first().json.correlationId }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "channel",
+              "displayName": "channel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "customerRef",
+              "displayName": "customerRef",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "language",
+              "displayName": "language",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "text",
+              "displayName": "text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "correlationId",
+              "displayName": "correlationId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "044abe34-ece4-513a-8374-6bf742ae62c0",
+      "name": "SendConfirmation",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2080,
+        -280
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DELETE FROM ar_chat_memory WHERE session_id = $1",
+        "options": {
+          "queryReplacement": "={{ $('DecideOutcome').first().json.sessionId }}"
+        }
+      },
+      "id": "dd8cc077-f698-5893-ba2f-e5263b0eba9e",
+      "name": "PurgeMemory",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2340,
+        -180
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "8qRROT7ySJEd370a",
+          "name": "AR lab Postgres (ar_lab)"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "r0DhjheXM3Dd6TF8"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sessionId",
+              "condition": "eq",
+              "keyValue": "={{ $('DecideOutcome').first().json.sessionId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "endedAt": "={{ $now.toUTC().toISO() }}",
+            "endReason": "={{ $('DecideOutcome').first().json.endReason }}",
+            "confirmationSent": "={{ $('DecideOutcome').first().json.needsConfirmation ? ($('SendConfirmation').first().json.ok === true) : ($('LoadSession').first().json.confirmationSent === true) }}",
+            "greetingName": "",
+            "offeredSlots": "[]"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "correlationId",
+              "displayName": "correlationId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "caseId",
+              "displayName": "caseId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "market",
+              "displayName": "market",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "language",
+              "displayName": "language",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "intent",
+              "displayName": "intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "customerRef",
+              "displayName": "customerRef",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "vehicleRef",
+              "displayName": "vehicleRef",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "greetingName",
+              "displayName": "greetingName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "vehicleLabel",
+              "displayName": "vehicleLabel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "dealerId",
+              "displayName": "dealerId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "dealerName",
+              "displayName": "dealerName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "offeredSlots",
+              "displayName": "offeredSlots",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "slotId",
+              "displayName": "slotId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "bookingRef",
+              "displayName": "bookingRef",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confirmationCode",
+              "displayName": "confirmationCode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confirmationChannel",
+              "displayName": "confirmationChannel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confirmationSent",
+              "displayName": "confirmationSent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "handoffReason",
+              "displayName": "handoffReason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "handoffResult",
+              "displayName": "handoffResult",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "handoffSummary",
+              "displayName": "handoffSummary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "turns",
+              "displayName": "turns",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "startedAt",
+              "displayName": "startedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "endedAt",
+              "displayName": "endedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "endReason",
+              "displayName": "endReason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "lastLatencyMs",
+              "displayName": "lastLatencyMs",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "0f90df4b-b8a8-5659-8810-7c17d235c264",
+      "name": "FinalizeSession",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2600,
+        -180
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "Av23wWiyWOZ3DXuQ",
+          "mode": "list",
+          "cachedResultName": "AR-17 Log event"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "correlationId": "={{ $('DecideOutcome').first().json.correlationId }}",
+            "sessionId": "={{ $('DecideOutcome').first().json.sessionId }}",
+            "caseId": "={{ $('DecideOutcome').first().json.caseId }}",
+            "workflow": "AR-03",
+            "event": "session_end",
+            "state": "={{ $('DecideOutcome').first().json.state }}",
+            "tool": "",
+            "latencyMs": "={{ Date.now() - $('ValidateEnd').first().json.startedAt }}",
+            "outcome": "={{ $('DecideOutcome').first().json.caseStatus }}",
+            "errorCode": "={{ $('CloseCase').first().json.ok === false ? 'case_update_failed' : '' }}",
+            "detail": "={{ 'endReason=' + $('DecideOutcome').first().json.endReason + ' booked=' + $('DecideOutcome').first().json.booked + ' memoryPurged=' + ($('PurgeMemory').first().json.error ? 'no' : 'yes') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "correlationId",
+              "displayName": "correlationId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "caseId",
+              "displayName": "caseId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "event",
+              "displayName": "event",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "tool",
+              "displayName": "tool",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "latencyMs",
+              "displayName": "latencyMs",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "outcome",
+              "displayName": "outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "errorCode",
+              "displayName": "errorCode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "detail",
+              "displayName": "detail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "28306846-35c9-5447-9522-d317ce0a83c9",
+      "name": "LogEnd",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2860,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, sessionId: $('DecideOutcome').first().json.sessionId, caseId: $('DecideOutcome').first().json.caseId, caseStatus: $('DecideOutcome').first().json.caseStatus, confirmationSent: $('DecideOutcome').first().json.needsConfirmation }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "c276d0ec-6ed7-5bd0-a2b0-e3359cbef601",
+      "name": "RespondEnd",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        3120,
+        -180
+      ]
+    }
+  ],
+  "connections": {
+    "ReceiveEnd": {
+      "main": [
+        [
+          {
+            "node": "ValidateEnd",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ValidateEnd": {
+      "main": [
+        [
+          {
+            "node": "IsValid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IsValid": {
+      "main": [
+        [
+          {
+            "node": "LoadSession",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RespondInvalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LoadSession": {
+      "main": [
+        [
+          {
+            "node": "SessionFound",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SessionFound": {
+      "main": [
+        [
+          {
+            "node": "DecideOutcome",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RespondNotFound",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DecideOutcome": {
+      "main": [
+        [
+          {
+            "node": "CloseCase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CloseCase": {
+      "main": [
+        [
+          {
+            "node": "NeedsConfirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NeedsConfirmation": {
+      "main": [
+        [
+          {
+            "node": "SendConfirmation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PurgeMemory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SendConfirmation": {
+      "main": [
+        [
+          {
+            "node": "PurgeMemory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PurgeMemory": {
+      "main": [
+        [
+          {
+            "node": "FinalizeSession",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FinalizeSession": {
+      "main": [
+        [
+          {
+            "node": "LogEnd",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LogEnd": {
+      "main": [
+        [
+          {
+            "node": "RespondEnd",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "POST /webhook/ar/v1/session/end. Closes or delegates the Sirius case, sends the confirmation if owed, purges the chat memory rows for the session, finalises the session row and logs. Idempotent."
+  }
+}
