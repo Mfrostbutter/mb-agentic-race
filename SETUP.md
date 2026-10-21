@@ -23,7 +23,7 @@ a container `http://localhost:5678` also works.
 ## 2. Setup: credentials, Data Tables, ids file
 
 ```bash
-git clone <this repository>
+git clone -b release/v2-native-nodes <this repository>   # or release/v1-code-nodes
 cd <repository>/workflows/voice-booking
 
 export N8N_URL=https://n8n.example.com        # no trailing slash

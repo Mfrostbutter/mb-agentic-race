@@ -13,6 +13,18 @@ a time.
 
 **Stand it up on your own instance: [SETUP.md](SETUP.md).**
 
+## Two builds, two branches
+
+| Branch | Build | Code nodes |
+|---|---|---|
+| `release/v1-code-nodes` | The first public build (2026-10-21 morning). Rules and guards as Code nodes | 40 |
+| `release/v2-native-nodes` | The same behaviour as native nodes: If, Switch, Edit Fields, Crypto, Data Table. Prompts in the `ar_prompts` table | 2 |
+
+Both pass the same five scripted calls. Pick one with `git clone -b <branch>`.
+`main` moves; the release branches do not. The two builds use the same
+webhook paths and table names, so run one set per instance, or deploy the
+second into its own project with the first set unpublished.
+
 ## How it works
 
 ```
