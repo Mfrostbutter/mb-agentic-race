@@ -41,10 +41,13 @@ python3 build/setup.py
 ```
 
 The setup script creates three credentials (`AR gateway bearer`, `AR chat
-memory Postgres`, `AR model endpoint`), six Data Tables (`ar_sessions`,
-`ar_events`, `ar_markets`, `ar_codes`, `ar_mock_bookings`, `ar_mock_cases`)
-and writes `lab-ids.json`, the per-instance configuration the generator and
-the deploy script read. Re-running reuses what exists by name. Secret values
+memory Postgres`, `AR model endpoint`), nine Data Tables (`ar_sessions`,
+`ar_events`, `ar_markets`, `ar_codes`, `ar_prompts`, `ar_mock_bookings`,
+`ar_mock_cases`, `ar_mock_customers`, `ar_mock_dealers`) and writes
+`lab-ids.json`, the per-instance configuration
+the generator and the deploy script read. Re-running reuses what exists by
+name; `python3 build/setup.py --tables-only` adds a new table or column to
+an instance that already runs the set, leaving credentials alone. Secret values
 go to n8n once and are never written to disk; keep them in your secret
 manager and export them for the session only.
 
@@ -72,8 +75,10 @@ JSON; the generator is the readable form and the JSON is its output.
 ## 4. Seed and test
 
 ```bash
-# markets (PL, ES, DE, GB) and the intent and handoff codes, once per instance
+# markets (PL, ES, DE, GB), the intent and handoff codes, and the prompts
+# (goals, rules and every spoken line per language), once per instance; safe to re-run
 curl -s -X POST -H "Authorization: Bearer $AR_GATEWAY_TOKEN" "$N8N_URL/webhook/ar/v1/admin/seed"
+# or: python3 scripts/ar-seed.py (reads AR_GATEWAY_TOKEN and N8N_URL from the environment)
 
 # health
 curl -s -H "Authorization: Bearer $AR_GATEWAY_TOKEN" "$N8N_URL/webhook/ar/v1/health"

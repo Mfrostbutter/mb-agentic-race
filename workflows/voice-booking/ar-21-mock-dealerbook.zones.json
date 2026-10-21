@@ -3,34 +3,42 @@
   "zones": [
     {
       "title": "Dealers",
-      "body": "Fixture dealers per market.",
+      "body": "Rows from ar_mock_dealers, narrowed by market, dealerId and city (accent-insensitive).",
       "color": 7,
       "nodes": [
         "ReceiveDealers",
+        "LoadDealers",
+        "AllDealers",
         "FilterDealers",
         "RespondDealers"
       ]
     },
     {
       "title": "Slots",
-      "body": "Deterministic from dealerId and date so tests repeat.",
+      "body": "Dealer row from ar_mock_dealers; slots deterministic from dealerId and date so tests repeat (the one Code node kept in the mocks).",
       "color": 7,
       "nodes": [
         "ReceiveSlots",
+        "LoadDealer",
         "GenerateSlots",
         "RespondSlots"
       ]
     },
     {
       "title": "Book",
-      "body": "A slotId containing FULL answers 409. Bookings persist in ar_mock_bookings.",
+      "body": "Required fields, then the FULL probe (409), then a confirmation code hashed from the idempotency key. Bookings persist in ar_mock_bookings.",
       "color": 7,
       "nodes": [
         "ReceiveBook",
+        "BookInvalid",
+        "SlotFull",
+        "HashKey",
         "ComputeBooking",
         "IsConflict",
         "UpsertBooking",
         "RespondBooked",
+        "ReplyInvalid",
+        "ReplyConflict",
         "RespondConflict"
       ]
     },
@@ -51,6 +59,7 @@
       "nodes": [
         "ReceiveBookings",
         "FindBookingsByVin",
+        "AllBookings",
         "ShapeBookings",
         "RespondBookings"
       ]
@@ -59,7 +68,7 @@
   "panels": [
     {
       "title": "Mock DealerBook",
-      "body": "Five endpoints under ar-mock/dealerbook/*. Slots are deterministic per dealer and date. A slotId containing FULL returns 409. Bookings persist in ar_mock_bookings.",
+      "body": "Five endpoints under ar-mock/dealerbook/*. Dealers are rows in ar_mock_dealers (seeded by AR-90). Slots are deterministic per dealer and date. A slotId containing FULL returns 409. Bookings persist in ar_mock_bookings.",
       "color": 6,
       "width": 768
     }

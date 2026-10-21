@@ -7,6 +7,8 @@
       "color": 4,
       "nodes": [
         "ReceiveTransferResult",
+        "LoadPrompts",
+        "Prompts",
         "LoadSession",
         "SessionFound",
         "RespondNotFound"
@@ -14,20 +16,24 @@
     },
     {
       "title": "Decide",
-      "body": "First failure: speak and retry once. Second failure: speak and end. Success: release.",
+      "body": "TransferOutcome: NOTIFY 2xx releases; a first failure speaks and retries once; a second failure speaks and ends. One retry, never a loop.",
       "color": 5,
       "nodes": [
+        "TransferOutcome",
         "DecideTransferAction",
         "UpdateTransfer",
         "LogTransfer",
-        "RespondTransfer"
+        "RespondTransfer",
+        "OnReleased",
+        "OnRetryOnce",
+        "OnFinal"
       ]
     }
   ],
   "panels": [
     {
       "title": "AR-04 Transfer result",
-      "body": "REFER acceptance is not completion. The outcome is stored on the session and the retry policy is one attempt.",
+      "body": "REFER acceptance is not completion. The outcome is stored on the session and the retry policy is one attempt: TransferOutcome routes to release, retry once, or end.",
       "color": 6,
       "width": 704
     }

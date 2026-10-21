@@ -76,12 +76,34 @@
     },
     {
       "parameters": {
-        "jsCode": "const r = $json; return [{ json: { ok: true, caseId: r.caseId, status: r.status } }];"
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e6f853f0-e46d-53d9-9bad-ead3aed76e9b",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "abc6b07f-ab91-5875-af2d-599b90b51613",
+              "name": "caseId",
+              "value": "={{ $json.caseId || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "b4d3ff25-c5f9-5e36-8c9b-de0fe481fb5f",
+              "name": "status",
+              "value": "={{ $json.status || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "eef097be-5a1a-5358-af79-f3f41b846bf0",
       "name": "ShapeCase",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
         416,
         0

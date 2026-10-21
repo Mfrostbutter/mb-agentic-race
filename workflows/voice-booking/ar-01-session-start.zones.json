@@ -3,20 +3,23 @@
   "zones": [
     {
       "title": "Receive",
-      "body": "The gateway posts the SIP UUI once the INVITE is answered. Header auth; a malformed body answers 400 and the call is released.",
+      "body": "The gateway posts the SIP UUI once the INVITE is answered. Header auth. ParseStart splits the raw UUI; ResolveMarket: gateway value, phone prefix, language, PL. A missing correlationId or a UUI version other than 1 answers 400 and the call is released.",
       "color": 4,
       "nodes": [
         "ReceiveStart",
         "ParseStart",
+        "ResolveMarket",
         "IsValid",
         "RespondInvalid"
       ]
     },
     {
       "title": "Idempotency",
-      "body": "A re-delivered correlationId returns the existing session without speaking again.",
+      "body": "Prompts are loaded once. A re-delivered correlationId returns the existing session without speaking again.",
       "color": 5,
       "nodes": [
+        "LoadPrompts",
+        "Prompts",
         "CheckExisting",
         "AlreadyStarted",
         "ShapeExisting",
@@ -35,10 +38,12 @@
     },
     {
       "title": "Session",
-      "body": "One row in ar_sessions per call; state starts at IDENTIFY. Every start is logged to ar_events.",
+      "body": "Random session id, one row in ar_sessions per call, state starts at IDENTIFY. The greeting is the market's disclosure plus the ar_prompts greeting in the session language. Every start is logged to ar_events.",
       "color": 3,
       "nodes": [
+        "GenerateSessionId",
         "ComposeSession",
+        "ComposeGreeting",
         "InsertSession",
         "LogStart"
       ]

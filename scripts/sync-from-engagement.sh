@@ -19,7 +19,7 @@ WF="$DST/workflows/voice-booking"
 rm -rf "$DST/workflows" "$DST/docs/agentic-race"
 mkdir -p "$WF/build" "$DST/docs" "$DST/scripts/canvas"
 cp "$SRC/workflows/agentic-race/build/gen.py" "$SRC/workflows/agentic-race/build/deploy.py" "$SRC/workflows/agentic-race/build/setup.py" "$WF/build/"
-cp "$SRC/scripts/ar-golden-run.py" "$SRC/scripts/organize_workflows.py" "$SRC/scripts/secrets_env.py" "$DST/scripts/"
+cp "$SRC/scripts/ar-golden-run.py" "$SRC/scripts/ar-seed.py" "$SRC/scripts/organize_workflows.py" "$SRC/scripts/secrets_env.py" "$DST/scripts/"
 cp "$SRC/scripts/canvas/zone_layout.py" "$SRC/scripts/canvas/layout_check.py" "$DST/scripts/canvas/"
 cp "$SRC/docs/agentic-race/04-workflow-catalogue.md" "$DST/docs/workflow-catalogue.md"
 
@@ -176,10 +176,10 @@ EOF
 # Regenerate the workflow JSON from the rewritten generator. A placeholder ids
 # file stands in for the one build/setup.py writes on a real instance.
 python3 - "$WF" <<'EOF'
-import json, sys, os
+import json, sys, os, re
 wf = sys.argv[1]
 ids = {k: "PENDING" for k in ("credPostgres", "credGatewayHeader", "credLmStudio")}
-ids.update({"dt_" + t: "PENDING" for t in ("ar_sessions", "ar_events", "ar_markets", "ar_codes", "ar_mock_bookings", "ar_mock_cases")})
+ids.update({"dt_" + t: "PENDING" for t in re.findall(r'^\s+"(ar_\w+)":\s*\[', open(os.path.join(wf, "build", "gen.py")).read(), re.M)})
 ids["modelBaseUrl"] = ""
 json.dump(ids, open(os.path.join(wf, "lab-ids.json"), "w"), indent=2)
 EOF

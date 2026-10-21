@@ -3,10 +3,11 @@
   "zones": [
     {
       "title": "Mock case system",
-      "body": "Case numbers deterministic per correlationId; rows in ar_mock_cases.",
+      "body": "Case number from a hash of the correlationId; rows in ar_mock_cases.",
       "color": 7,
       "nodes": [
         "ReceiveCaseOp",
+        "HashCorrelation",
         "ComputeCase",
         "UpsertCase",
         "RespondCase"
@@ -16,7 +17,7 @@
   "panels": [
     {
       "title": "Mock case system",
-      "body": "One endpoint, op in the body. Case numbers are deterministic from the correlation ID, so a re-created case is the same case.",
+      "body": "One endpoint, op in the body. Case numbers are deterministic from the correlation ID (SHA-256), so a re-created case is the same case. Real build: the case system's REST with OAuth2 client credentials.",
       "color": 6,
       "width": 704
     }

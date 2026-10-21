@@ -27,12 +27,82 @@
     },
     {
       "parameters": {
-        "jsCode": "const b = $json.body || {};\nconst errors = [];\nif (!b.sessionId) errors.push('sessionId missing');\nif (typeof b.transcript !== 'string') errors.push('transcript missing');\nreturn [{ json: { valid: !errors.length, statusCode: errors.length ? 400 : 200, error: errors.length ? 'validation_error' : null, message: errors.join('; ') || null,\n  sessionId: String(b.sessionId || ''), correlationId: String(b.correlationId || ''), transcript: String(b.transcript || '').trim(), language: String(b.language || '').slice(0, 2),\n  asrConfidence: typeof b.asrConfidence === 'number' ? b.asrConfidence : null, turn: b.turn || null, startedAt: Date.now() } }];"
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e46fcc7f-e754-58ac-abce-39b34ba2a8a2",
+              "name": "valid",
+              "value": "={{ (!!($json.body || {}).sessionId && typeof ($json.body || {}).transcript === 'string') }}",
+              "type": "boolean"
+            },
+            {
+              "id": "79495efd-9462-54fb-b3ae-aef9ec522171",
+              "name": "statusCode",
+              "value": "={{ (!!($json.body || {}).sessionId && typeof ($json.body || {}).transcript === 'string') ? 200 : 400 }}",
+              "type": "number"
+            },
+            {
+              "id": "f779f5bd-60fe-5a3f-ad2b-10f582c0c8ef",
+              "name": "error",
+              "value": "={{ (!!($json.body || {}).sessionId && typeof ($json.body || {}).transcript === 'string') ? '' : 'validation_error' }}",
+              "type": "string"
+            },
+            {
+              "id": "9b3e20cc-adae-5dd3-8143-aa5dcac54748",
+              "name": "message",
+              "value": "={{ [!($json.body || {}).sessionId ? 'sessionId missing' : '', typeof ($json.body || {}).transcript !== 'string' ? 'transcript missing' : ''].filter(Boolean).join('; ') }}",
+              "type": "string"
+            },
+            {
+              "id": "f6c80568-f9ea-5adf-a741-7beca699209a",
+              "name": "sessionId",
+              "value": "={{ String(($json.body || {}).sessionId || '') }}",
+              "type": "string"
+            },
+            {
+              "id": "0f09003b-50f0-5d4a-a1bf-90b5f8231d9e",
+              "name": "correlationId",
+              "value": "={{ String(($json.body || {}).correlationId || '') }}",
+              "type": "string"
+            },
+            {
+              "id": "b440a38c-3a60-5d08-9f84-c5f8b25edc22",
+              "name": "transcript",
+              "value": "={{ String(($json.body || {}).transcript || '').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "af811a80-eeab-5287-b966-ccef724f64b7",
+              "name": "language",
+              "value": "={{ String(($json.body || {}).language || '').slice(0, 2) }}",
+              "type": "string"
+            },
+            {
+              "id": "ecbbe48a-0528-54ac-ba31-0db1c27e568a",
+              "name": "asrConfidence",
+              "value": "={{ typeof ($json.body || {}).asrConfidence === 'number' ? ($json.body || {}).asrConfidence : 1 }}",
+              "type": "number"
+            },
+            {
+              "id": "c267d5f5-2feb-56fa-b5e1-d0aa2169229e",
+              "name": "turn",
+              "value": "={{ Number(($json.body || {}).turn) || 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "4d9f2e7b-acf6-5493-810e-b05e8295bb86",
+              "name": "startedAt",
+              "value": "={{ Date.now() }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "52deec64-d0a7-50eb-83c2-7ff150c0dcc0",
       "name": "ValidateTurn",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
         208,
         0
@@ -97,13 +167,47 @@
           "mode": "id",
           "value": "PENDING"
         },
+        "returnAll": true
+      },
+      "id": "9af826d4-2c96-54e3-9310-ca44d03dbe9f",
+      "name": "LoadPrompts",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "prompts",
+        "options": {}
+      },
+      "id": "99daec6c-157c-5408-8777-6f1e354a6833",
+      "name": "Prompts",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PENDING"
+        },
         "matchType": "allConditions",
         "filters": {
           "conditions": [
             {
               "keyName": "sessionId",
               "condition": "eq",
-              "keyValue": "={{ $json.sessionId }}"
+              "keyValue": "={{ $('ValidateTurn').first().json.sessionId }}"
             }
           ]
         },
@@ -115,7 +219,7 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        672,
+        1088,
         0
       ],
       "alwaysOutputData": true
@@ -150,7 +254,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        880,
+        1296,
         0
       ]
     },
@@ -167,7 +271,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        880,
+        1296,
         272
       ]
     },
@@ -197,22 +301,735 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        1088,
+        1504,
         0
       ],
       "alwaysOutputData": true
     },
     {
       "parameters": {
-        "jsCode": "// Assembles the facts and the goal for this turn. The system prompt is rebuilt every turn from the session row, so state lives in n8n, not in the model.\nconst req = $('ValidateTurn').first().json;\nconst s = $('LoadSession').first().json;\nconst m = $('LoadMarket').first().json;\nconst lang = s.language || m.defaultLanguage || 'en';\nconst langName = ({ pl: 'Polish', es: 'Spanish', de: 'German', en: 'English' })[lang] || 'English';\nlet offered = []; try { offered = JSON.parse(s.offeredSlots || '[]'); } catch (e) { offered = []; }\nconst slotLines = offered.length ? offered.map(o => `- slotId ${o.slotId}: ${o.label} at ${o.dealerName || s.dealerName}`).join('\\n') : '(none offered yet)';\nconst lowConf = req.asrConfidence !== null && req.asrConfidence < 0.5;\nconst goals = {\n  IDENTIFY: 'Confirm you are speaking with the customer named in the facts about the vehicle named in the facts, in one short question. Never read out a VIN or a phone number. If the caller says it is not them, or no customer is known, set action handoff with handoffReason IDENTIFICATION_FAILED. When confirmed, move to CONSENT.',\n  CONSENT: 'The AI disclosure was already spoken. Ask once whether the caller is happy to continue with the assistant. Yes: move to NEED. No: set action handoff with handoffReason POLICY.',\n  NEED: 'Find out what the caller needs: a new appointment (intent BOOK), moving an existing one (RESCHEDULE), cancelling (CANCEL) or something else (OTHER, then action handoff with SCENARIO_REQUIRES_AGENT). For BOOK, collect the service type (inspection, regular service, tyre change, repair, warning light, other) and whether replacement mobility is needed, then move to DEALER.',\n  DEALER: 'Propose the preferred dealer from the facts; it can be booked here. If the caller wants a different one, ask for the city and call FindDealers. Only a dealer that FindDealers returned with bookable false cannot be booked here: then set action handoff with SCENARIO_REQUIRES_AGENT. When a dealer is agreed, move to SLOT and call FindSlots.',\n  SLOT: 'Call FindSlots for the agreed dealer and the earliest date the caller wants, then offer at most three options by day and time, never by slotId. If none fits, call FindSlots once more with a later fromDate; if still none, set action handoff with NO_SLOT. When the caller picks one, move to CONFIRM.',\n  CONFIRM: 'Read back dealer, day, time, service type and mobility, put the slotId of that option in the slotId field, and ask for an explicit yes. Booking is only possible in the turn after the read-back, once the caller has said yes: then call BookAppointment with the same slotId. If BookAppointment answers not_confirmed, read the slot back again and ask for a yes. Never say the appointment is booked before BookAppointment returns a confirmation code. After a confirmation code, move to BOOKED and read the code back.',\n  BOOKED: 'Tell the caller the confirmation code slowly, that a confirmation message will follow, ask if there is anything else. If nothing else, say goodbye with action end and state WRAPUP.',\n  WRAPUP: 'Close politely with action end.',\n  HANDOFF: 'Say a colleague will take over and set action handoff.'\n};\nconst rowState = s.state || 'IDENTIFY';\n// Deterministic yes/no gates for IDENTIFY and CONSENT, so a small model cannot loop on a confirmed question.\nconst utter = String(req.transcript || '').trim().toLowerCase();\nconst saidYes = /^(tak|zgadza|owszem|dok[łl]adnie|to ja|oczywi[śs]cie|jasne|s[íi]|claro|correcto|as[íi] es|soy yo|exacto|vale|de acuerdo|por supuesto|ja|genau|richtig|korrekt|das bin ich|stimmt|nat[üu]rlich|gerne|in ordnung|yes|yeah|yep|correct|that'?s me|that is me|sure|of course|go ahead|ok(ay)?)(?=[\\s,.!?;:]|$)/.test(utter);\nconst saidNo = /^(nie|no|nein|not me|wrong)(?=[\\s,.!?;:]|$)/.test(utter);\nlet gateAdvanced = false; let gateDecline = '';\nlet state = rowState;\nif (rowState === 'IDENTIFY' && saidYes) { state = 'CONSENT'; gateAdvanced = true; }\nif (rowState === 'CONSENT' && saidYes) { state = 'NEED'; gateAdvanced = true; }\nif (rowState === 'DEALER' && saidYes && s.dealerId) { state = 'SLOT'; gateAdvanced = true; }\nif (rowState === 'IDENTIFY' && (saidNo || !s.customerRef)) gateDecline = 'IDENTIFICATION_FAILED';\nif (rowState === 'CONSENT' && saidNo) gateDecline = 'POLICY';\nconst facts = [\n  gateAdvanced ? `The caller has just ${rowState === 'IDENTIFY' ? 'confirmed their identity' : rowState === 'CONSENT' ? 'agreed to continue with the assistant' : `agreed to the dealer ${s.dealerName} (dealerId ${s.dealerId}); call FindSlots for it now`}. Do not ask that again; follow the current goal.` : '',\n  `Session state: ${state}.`,\n  `Customer known: ${s.customerRef ? 'yes' : 'no'}.`,\n  s.greetingName ? `Name to address the customer: ${s.greetingName}.` : '',\n  s.vehicleLabel ? `Vehicle: ${s.vehicleLabel}.` : '',\n  s.dealerName ? `Preferred dealer: ${s.dealerName} (dealerId ${s.dealerId}).` : 'Preferred dealer: none on file.',\n  `Market: ${s.market}. Online booking enabled in this market: ${String(m.bookable) === 'false' ? 'no' : 'yes'}.`,\n  s.bookingRef ? `Booking already made in this call: confirmation code ${s.confirmationCode}.` : 'No booking made yet in this call.',\n  `Offered slots in this call:\\n${slotLines}`,\n  `Today is ${new Date().toISOString().slice(0, 10)} (UTC).`\n].filter(Boolean).join('\\n');\nconst systemPrompt = `You are the workshop service appointment assistant on a live phone call. Speak ${langName} only. Keep every reply under 45 words, one question at a time, no lists, no markdown; say numbers, dates and times the way a person would on the phone.\n\nCurrent goal (state ${state}): ${goals[state] || goals.NEED}\n\nFacts you may rely on:\n${facts}\n\nRules:\n- Never invent a dealer, a time slot, a confirmation code or any customer data. Dealers come from FindDealers, slots from FindSlots, confirmation codes from BookAppointment.\n- Never say an appointment is booked, confirmed or reserved unless BookAppointment returned a confirmation code in this call.\n- If the caller asks for a person at any point, set action handoff with handoffReason CALLER_REQUEST.\n- If you could not understand the caller twice in a row, set action handoff with handoffReason NOT_UNDERSTOOD.\n- If a tool reports it is unavailable, apologise once and set action handoff with handoffReason BACKEND_UNAVAILABLE.\n- Move the state forward only when its goal is met. Allowed states: IDENTIFY, CONSENT, NEED, DEALER, SLOT, CONFIRM, BOOKED, WRAPUP, HANDOFF.\n- Return only json matching the schema. The speak field is read aloud to the caller.${lowConf ? '\\n- The speech recogniser reported low confidence for this utterance; if it is unclear, ask the caller to repeat.' : ''}`;\nreturn [{ json: { sessionId: s.sessionId, correlationId: s.correlationId, caseId: s.caseId, market: s.market, language: lang, state, chatInput: req.transcript || '(silence)', systemPrompt, startedAt: req.startedAt, turn: (Number(s.turns) || 0) + 1, lowConf, handoverLine: m.handoverLine || '', offeredSlotIds: offered.map(o => o.slotId), pendingSlotId: s.slotId || '', gateAdvanced, gateDecline } }];"
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2856198d-770f-5bc3-b91a-7dd32c7542ff",
+              "name": "sessionId",
+              "value": "={{ $('LoadSession').first().json.sessionId }}",
+              "type": "string"
+            },
+            {
+              "id": "2d5c9fb4-5f24-55a7-8b60-7b436e9afc9f",
+              "name": "correlationId",
+              "value": "={{ $('LoadSession').first().json.correlationId || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "58e0617a-e2f5-50d7-b741-e834d061ca2a",
+              "name": "caseId",
+              "value": "={{ $('LoadSession').first().json.caseId || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "2f13db1c-88bc-5ebd-ac04-635c2c00558a",
+              "name": "market",
+              "value": "={{ $('LoadSession').first().json.market || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "d8b0b909-c819-53aa-a302-809da0c04ead",
+              "name": "language",
+              "value": "={{ $('LoadSession').first().json.language || $json.defaultLanguage || 'en' }}",
+              "type": "string"
+            },
+            {
+              "id": "d2d8a184-7462-5ba6-8e0e-7a9dac3cb59f",
+              "name": "rowState",
+              "value": "={{ $('LoadSession').first().json.state || 'IDENTIFY' }}",
+              "type": "string"
+            },
+            {
+              "id": "2f1d6997-03a3-58f9-987a-b8f242aac876",
+              "name": "state",
+              "value": "={{ $('LoadSession').first().json.state || 'IDENTIFY' }}",
+              "type": "string"
+            },
+            {
+              "id": "dd54290f-546f-5189-9a11-d36997d9dc74",
+              "name": "gateAdvanced",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "77f432de-e28c-56fc-8113-5159d2bc079f",
+              "name": "gateDecline",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "140442b6-bfd1-53c0-9010-c2b3dfab807a",
+              "name": "utter",
+              "value": "={{ String($('ValidateTurn').first().json.transcript || '').trim().toLowerCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "5e4ab842-904a-5ef3-bf3c-4ff7b707a96a",
+              "name": "chatInput",
+              "value": "={{ $('ValidateTurn').first().json.transcript || '(silence)' }}",
+              "type": "string"
+            },
+            {
+              "id": "ff840925-0381-5704-a20a-cf5d93a2f81e",
+              "name": "customerRef",
+              "value": "={{ $('LoadSession').first().json.customerRef || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "49150f5e-8716-5f85-9b54-3f35d8607aee",
+              "name": "greetingName",
+              "value": "={{ $('LoadSession').first().json.greetingName || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "11e1fa6f-20a5-515a-96f9-7d54930a4b2f",
+              "name": "vehicleLabel",
+              "value": "={{ $('LoadSession').first().json.vehicleLabel || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "f415f3ae-eebc-56a7-a088-cc9d80fabffb",
+              "name": "dealerId",
+              "value": "={{ $('LoadSession').first().json.dealerId || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "ddc80b50-c66b-554c-b5da-31d9ea143bc0",
+              "name": "dealerName",
+              "value": "={{ $('LoadSession').first().json.dealerName || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "857f4c17-304d-503d-a841-25c90d5fa666",
+              "name": "bookingRef",
+              "value": "={{ $('LoadSession').first().json.bookingRef || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "6b42a660-4054-576c-b829-23dfee992167",
+              "name": "confirmationCode",
+              "value": "={{ $('LoadSession').first().json.confirmationCode || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "a91388f7-2d6a-5368-bc54-88b5b19c4ac9",
+              "name": "pendingSlotId",
+              "value": "={{ $('LoadSession').first().json.slotId || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "f6289926-15eb-5d5f-bd8b-953495087353",
+              "name": "offered",
+              "value": "={{ JSON.parse($('LoadSession').first().json.offeredSlots || '[]') }}",
+              "type": "array"
+            },
+            {
+              "id": "43256b3f-1032-5315-b868-de342e629222",
+              "name": "marketBookable",
+              "value": "={{ String($json.bookable) !== 'false' }}",
+              "type": "boolean"
+            },
+            {
+              "id": "26de518d-531b-5510-9587-56a7fb292cd7",
+              "name": "handoverLine",
+              "value": "={{ $json.handoverLine || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "3c21e5de-f330-5fab-989f-1301a390a99c",
+              "name": "lowConf",
+              "value": "={{ $('ValidateTurn').first().json.asrConfidence !== null && $('ValidateTurn').first().json.asrConfidence < 0.5 }}",
+              "type": "boolean"
+            },
+            {
+              "id": "8b6aa359-642f-5781-8f35-408af539b26e",
+              "name": "turn",
+              "value": "={{ (Number($('LoadSession').first().json.turns) || 0) + 1 }}",
+              "type": "number"
+            },
+            {
+              "id": "e54d2600-ce15-57d1-893a-dcc3af4920ea",
+              "name": "startedAt",
+              "value": "={{ $('ValidateTurn').first().json.startedAt }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2b656060-e217-51b7-b1a3-ca3f8932fdae",
+      "name": "TurnFacts",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "259c8645-f356-59d8-98dc-77331fb87eca",
+                    "leftValue": "={{ $json.rowState }}",
+                    "rightValue": "IDENTIFY",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "id": "0bad1730-5171-5eb6-98e2-9db71d028a16",
+                    "leftValue": "={{ $json.utter }}",
+                    "rightValue": "^(nie|no|nein|not me|wrong)(?=[\\s,.!?;:]|$)",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "IdentityDenied"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c1b6c087-52a3-5058-955a-3c872db44cfd",
+                    "leftValue": "={{ $json.rowState }}",
+                    "rightValue": "IDENTIFY",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "id": "243e4b3c-da51-50db-a9ae-b293ae110667",
+                    "leftValue": "={{ $json.customerRef }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "empty",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "CustomerUnknown"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "a5ed1b86-258b-5564-adb5-788cebe60c34",
+                    "leftValue": "={{ $json.rowState }}",
+                    "rightValue": "IDENTIFY",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "id": "451f6356-6e62-5db7-a213-49eabcc679b4",
+                    "leftValue": "={{ $json.utter }}",
+                    "rightValue": "^(tak|zgadza|owszem|dok[łl]adnie|to ja|oczywi[śs]cie|jasne|s[íi]|claro|correcto|as[íi] es|soy yo|exacto|vale|de acuerdo|por supuesto|ja|genau|richtig|korrekt|das bin ich|stimmt|nat[üu]rlich|gerne|in ordnung|yes|yeah|yep|correct|that'?s me|that is me|sure|of course|go ahead|ok(ay)?)(?=[\\s,.!?;:]|$)",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "IdentityConfirmed"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "a83aaea0-204d-595d-87f7-9a30dcf4791a",
+                    "leftValue": "={{ $json.rowState }}",
+                    "rightValue": "CONSENT",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "id": "1c5498ac-52f0-53db-ac7f-7206ba93bc46",
+                    "leftValue": "={{ $json.utter }}",
+                    "rightValue": "^(nie|no|nein|not me|wrong)(?=[\\s,.!?;:]|$)",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ConsentDeclined"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "a719edd4-d3e9-5b0e-9a7a-2358592d4168",
+                    "leftValue": "={{ $json.rowState }}",
+                    "rightValue": "CONSENT",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "id": "c2740325-1f0b-5266-ae99-fdb629183a6e",
+                    "leftValue": "={{ $json.utter }}",
+                    "rightValue": "^(tak|zgadza|owszem|dok[łl]adnie|to ja|oczywi[śs]cie|jasne|s[íi]|claro|correcto|as[íi] es|soy yo|exacto|vale|de acuerdo|por supuesto|ja|genau|richtig|korrekt|das bin ich|stimmt|nat[üu]rlich|gerne|in ordnung|yes|yeah|yep|correct|that'?s me|that is me|sure|of course|go ahead|ok(ay)?)(?=[\\s,.!?;:]|$)",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ConsentGiven"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "2730ae59-704d-52dc-8575-6e07b6fb5c11",
+                    "leftValue": "={{ $json.rowState }}",
+                    "rightValue": "DEALER",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "id": "2fdf17af-f7d1-5fea-8844-97215366a178",
+                    "leftValue": "={{ $json.utter }}",
+                    "rightValue": "^(tak|zgadza|owszem|dok[łl]adnie|to ja|oczywi[śs]cie|jasne|s[íi]|claro|correcto|as[íi] es|soy yo|exacto|vale|de acuerdo|por supuesto|ja|genau|richtig|korrekt|das bin ich|stimmt|nat[üu]rlich|gerne|in ordnung|yes|yeah|yep|correct|that'?s me|that is me|sure|of course|go ahead|ok(ay)?)(?=[\\s,.!?;:]|$)",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  },
+                  {
+                    "id": "914fa894-2598-55e5-97ef-4dffdf7bc901",
+                    "leftValue": "={{ $json.dealerId }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEmpty",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "DealerAgreed"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "NoGate"
+        }
+      },
+      "id": "4667f8d7-6f4e-5582-8737-9bcf929de6a7",
+      "name": "YesNoGate",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3c76a7c2-764a-5261-b05d-c729cb0094a4",
+              "name": "gateDecline",
+              "value": "IDENTIFICATION_FAILED",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "2a8f4fc9-b441-5319-a528-244a0bc4a0d7",
+      "name": "OnIdentityFailed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        976
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "689760ad-d84b-5957-aaf5-cb028b2abfd1",
+              "name": "state",
+              "value": "CONSENT",
+              "type": "string"
+            },
+            {
+              "id": "2c205486-d19c-5616-a4c4-5b3fb965b289",
+              "name": "gateAdvanced",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "8e6311c3-a095-5c93-8e60-8ecfa3f2aef7",
+      "name": "OnIdentityConfirmed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        1248
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cd29f1f2-7a80-53a0-b31b-17ff030ecdd8",
+              "name": "gateDecline",
+              "value": "POLICY",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "513e7ebd-ea27-540c-b31c-b0defdd14f98",
+      "name": "OnConsentDeclined",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        1520
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d07e715c-7593-5a74-9cbf-e93d499c3e05",
+              "name": "state",
+              "value": "NEED",
+              "type": "string"
+            },
+            {
+              "id": "67cc7052-610c-5d14-a6e9-5f1d4945bdc9",
+              "name": "gateAdvanced",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "cae9c692-923d-5e3f-9801-4f4317d54b70",
+      "name": "OnConsentGiven",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        1792
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9eea7e25-81a8-59af-8050-49165d581325",
+              "name": "state",
+              "value": "SLOT",
+              "type": "string"
+            },
+            {
+              "id": "b5fb0e1f-5c23-5270-8542-25c6eb411fd7",
+              "name": "gateAdvanced",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "454b5936-2553-5557-96b2-2647e124b60e",
+      "name": "OnDealerAgreed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        2064
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5dbd5f6a-2783-5a12-a5db-f2d65060cdae",
+              "name": "languageName",
+              "value": "={{ (($('Prompts').first().json.prompts.find(p => p.key === 'languageName') || {})[$json.language] || ($('Prompts').first().json.prompts.find(p => p.key === 'languageName') || {}).en || '') }}",
+              "type": "string"
+            },
+            {
+              "id": "2ac80006-362b-5b52-b219-98d7ef58c229",
+              "name": "persona",
+              "value": "={{ (($('Prompts').first().json.prompts.find(p => p.key === 'persona') || {})['en'] || ($('Prompts').first().json.prompts.find(p => p.key === 'persona') || {}).en || '').replace('{language}', (($('Prompts').first().json.prompts.find(p => p.key === 'languageName') || {})[$json.language] || ($('Prompts').first().json.prompts.find(p => p.key === 'languageName') || {}).en || '')) }}",
+              "type": "string"
+            },
+            {
+              "id": "6ac8f56e-8407-5e17-a7b5-cb5652d7f366",
+              "name": "goalText",
+              "value": "={{ (($('Prompts').first().json.prompts.find(p => p.key === 'goal_' + $json.state) || $('Prompts').first().json.prompts.find(p => p.key === 'goal_NEED') || {}).en || '') }}",
+              "type": "string"
+            },
+            {
+              "id": "8fd253b9-933e-548f-932a-93eb78d08b59",
+              "name": "rulesText",
+              "value": "={{ (($('Prompts').first().json.prompts.find(p => p.key === 'rules') || {})['en'] || ($('Prompts').first().json.prompts.find(p => p.key === 'rules') || {}).en || '') }}",
+              "type": "string"
+            },
+            {
+              "id": "5ff94829-c2d5-5526-8a67-9c448e9056ed",
+              "name": "gateLine",
+              "value": "={{ $json.gateAdvanced ? 'The caller has just ' + ($json.rowState === 'IDENTIFY' ? 'confirmed their identity' : $json.rowState === 'CONSENT' ? 'agreed to continue with the assistant' : 'agreed to the dealer ' + $json.dealerName + ' (dealerId ' + $json.dealerId + '); call FindSlots for it now') + '. Do not ask that again; follow the current goal.' : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "552a5940-3c39-55c8-b301-2d8ee34f4995",
+              "name": "slotLines",
+              "value": "={{ $json.offered.length ? $json.offered.map(o => '- slotId ' + o.slotId + ': ' + o.label + ' at ' + (o.dealerName || $json.dealerName)).join('\\n') : '(none offered yet)' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "b848b3f3-4ef2-5ff4-be7f-9bbc315140ca",
+      "name": "AssembleFacts",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4711df15-45a0-5633-b9c2-910fd0043415",
+              "name": "factsText",
+              "value": "={{ [ $json.gateLine, 'Session state: ' + $json.state + '.', 'Customer known: ' + ($json.customerRef ? 'yes' : 'no') + '.', $json.greetingName ? 'Name to address the customer: ' + $json.greetingName + '.' : '', $json.vehicleLabel ? 'Vehicle: ' + $json.vehicleLabel + '.' : '', $json.dealerName ? 'Preferred dealer: ' + $json.dealerName + ' (dealerId ' + $json.dealerId + ').' : 'Preferred dealer: none on file.', 'Market: ' + $json.market + '. Online booking enabled in this market: ' + ($json.marketBookable ? 'yes' : 'no') + '.', $json.bookingRef ? 'Booking already made in this call: confirmation code ' + $json.confirmationCode + '.' : 'No booking made yet in this call.', 'Offered slots in this call:\\n' + $json.slotLines, 'Today is ' + new Date().toISOString().slice(0, 10) + ' (UTC).' ].filter(Boolean).join('\\n') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "104e9a33-f068-5bb5-b63a-c76182f1be97",
+      "name": "ComposeFacts",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        624,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6d2f6156-be50-54fa-84bb-825b7f75b9a9",
+              "name": "sessionId",
+              "value": "={{ $json.sessionId }}",
+              "type": "string"
+            },
+            {
+              "id": "5921ab29-7be7-5f34-8408-8c142d6696b6",
+              "name": "correlationId",
+              "value": "={{ $json.correlationId }}",
+              "type": "string"
+            },
+            {
+              "id": "4d22af7f-a9c4-52ec-b4c6-95b0ddae013c",
+              "name": "caseId",
+              "value": "={{ $json.caseId }}",
+              "type": "string"
+            },
+            {
+              "id": "4adf8f2d-7ad0-55b6-8b44-ba0234d0cfe9",
+              "name": "market",
+              "value": "={{ $json.market }}",
+              "type": "string"
+            },
+            {
+              "id": "d0bd7f22-4229-5b5c-8cb2-151dde291948",
+              "name": "language",
+              "value": "={{ $json.language }}",
+              "type": "string"
+            },
+            {
+              "id": "3aa05f6e-7a33-54d6-bd37-2f787aea1c57",
+              "name": "state",
+              "value": "={{ $json.state }}",
+              "type": "string"
+            },
+            {
+              "id": "dfeb31d0-7346-5897-99ae-e927d28c66fe",
+              "name": "chatInput",
+              "value": "={{ $json.chatInput }}",
+              "type": "string"
+            },
+            {
+              "id": "c9ce52bd-ff0f-5c9c-b783-2139e801d822",
+              "name": "systemPrompt",
+              "value": "={{ $json.persona + '\\n\\nCurrent goal (state ' + $json.state + '): ' + $json.goalText + '\\n\\nFacts you may rely on:\\n' + $json.factsText + '\\n\\nRules:\\n' + $json.rulesText + ($json.lowConf ? '\\n- The speech recogniser reported low confidence for this utterance; if it is unclear, ask the caller to repeat.' : '') }}",
+              "type": "string"
+            },
+            {
+              "id": "a27bdd9d-acde-5b08-bb42-feef1c75ee2f",
+              "name": "startedAt",
+              "value": "={{ $json.startedAt }}",
+              "type": "number"
+            },
+            {
+              "id": "a227f82e-0f48-5eea-bbbc-3d68630b6b52",
+              "name": "turn",
+              "value": "={{ $json.turn }}",
+              "type": "number"
+            },
+            {
+              "id": "7567ec4f-c610-56e7-a877-5442bc754db5",
+              "name": "lowConf",
+              "value": "={{ $json.lowConf }}",
+              "type": "boolean"
+            },
+            {
+              "id": "18f633b7-125f-5c35-96af-a044a65818af",
+              "name": "handoverLine",
+              "value": "={{ $json.handoverLine }}",
+              "type": "string"
+            },
+            {
+              "id": "0cda2a6b-3adc-5a34-a344-21d244d1755a",
+              "name": "offeredSlotIds",
+              "value": "={{ $json.offered.map(o => o.slotId) }}",
+              "type": "array"
+            },
+            {
+              "id": "9a838fcc-e0cc-5a48-8161-86f944e686cf",
+              "name": "pendingSlotId",
+              "value": "={{ $json.pendingSlotId }}",
+              "type": "string"
+            },
+            {
+              "id": "88ff99e6-2f4f-5a89-8e5b-eae5381cde89",
+              "name": "gateAdvanced",
+              "value": "={{ $json.gateAdvanced }}",
+              "type": "boolean"
+            },
+            {
+              "id": "549cf2a3-2f49-50f9-b95c-725551b8affe",
+              "name": "gateDecline",
+              "value": "={{ $json.gateDecline }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "ccbecd10-c93b-5ebe-ba0b-9c2760990151",
       "name": "PrepareTurn",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
-        0,
-        672
+        832,
+        704
       ]
     },
     {
@@ -230,8 +1047,8 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
       "position": [
-        208,
-        672
+        0,
+        2448
       ],
       "onError": "continueErrorOutput"
     },
@@ -253,7 +1070,7 @@
       "typeVersion": 1.3,
       "position": [
         0,
-        944
+        2720
       ],
       "credentials": {
         "openAiApi": {
@@ -275,7 +1092,7 @@
       "typeVersion": 1.4,
       "position": [
         208,
-        944
+        2720
       ],
       "credentials": {
         "postgres": {
@@ -296,7 +1113,7 @@
       "typeVersion": 1.3,
       "position": [
         416,
-        944
+        2720
       ]
     },
     {
@@ -317,7 +1134,7 @@
       "typeVersion": 1.3,
       "position": [
         624,
-        1216
+        2992
       ],
       "credentials": {
         "openAiApi": {
@@ -374,7 +1191,7 @@
       "typeVersion": 2.2,
       "position": [
         0,
-        1216
+        2992
       ]
     },
     {
@@ -447,7 +1264,7 @@
       "typeVersion": 2.2,
       "position": [
         208,
-        1216
+        2992
       ]
     },
     {
@@ -531,7 +1348,7 @@
       "typeVersion": 2.2,
       "position": [
         416,
-        1216
+        2992
       ]
     },
     {
@@ -561,7 +1378,7 @@
       "typeVersion": 1.1,
       "position": [
         0,
-        1616
+        3392
       ],
       "alwaysOutputData": true
     },
@@ -681,7 +1498,7 @@
       "typeVersion": 3.4,
       "position": [
         208,
-        1616
+        3392
       ]
     },
     {
@@ -747,7 +1564,7 @@
       "typeVersion": 3.4,
       "position": [
         416,
-        1616
+        3392
       ]
     },
     {
@@ -800,7 +1617,7 @@
       "typeVersion": 2.2,
       "position": [
         624,
-        1616
+        3392
       ]
     },
     {
@@ -836,7 +1653,7 @@
       "typeVersion": 3.4,
       "position": [
         624,
-        1888
+        3664
       ]
     },
     {
@@ -889,7 +1706,7 @@
       "typeVersion": 2.2,
       "position": [
         832,
-        1616
+        3392
       ]
     },
     {
@@ -919,7 +1736,7 @@
       "typeVersion": 3.4,
       "position": [
         832,
-        1888
+        3664
       ]
     },
     {
@@ -971,7 +1788,7 @@
       "typeVersion": 2.2,
       "position": [
         1040,
-        1616
+        3392
       ]
     },
     {
@@ -1019,7 +1836,7 @@
       "typeVersion": 3.4,
       "position": [
         1040,
-        1888
+        3664
       ]
     },
     {
@@ -1080,7 +1897,7 @@
       "typeVersion": 2.2,
       "position": [
         0,
-        2288
+        4064
       ]
     },
     {
@@ -1116,7 +1933,7 @@
       "typeVersion": 3.4,
       "position": [
         0,
-        2560
+        4336
       ]
     },
     {
@@ -1146,7 +1963,7 @@
       "typeVersion": 3.4,
       "position": [
         208,
-        2288
+        4064
       ]
     },
     {
@@ -1189,7 +2006,7 @@
       "typeVersion": 2.2,
       "position": [
         416,
-        2288
+        4064
       ]
     },
     {
@@ -1199,7 +2016,7 @@
             {
               "id": "955b2b7e-7d8f-5a89-946c-b4f0766b67a0",
               "name": "speak",
-              "value": "={{ ({\"pl\": \"Jeszcze nie zarezerwowałem terminu. Czy mam go teraz zarezerwować?\", \"es\": \"Todavía no he reservado la cita. ¿Quiere que la reserve ahora?\", \"de\": \"Ich habe den Termin noch nicht gebucht. Soll ich ihn jetzt buchen?\", \"en\": \"I have not booked the appointment yet. Shall I book it now?\"})[$json.language] || \"I have not booked the appointment yet. Shall I book it now?\" }}",
+              "value": "={{ (($('Prompts').first().json.prompts.find(p => p.key === 'notBooked') || {})[$json.language] || ($('Prompts').first().json.prompts.find(p => p.key === 'notBooked') || {}).en || '') }}",
               "type": "string"
             },
             {
@@ -1231,7 +2048,7 @@
       "typeVersion": 3.4,
       "position": [
         416,
-        2560
+        4336
       ]
     },
     {
@@ -1275,7 +2092,7 @@
       "typeVersion": 2.2,
       "position": [
         624,
-        2288
+        4064
       ]
     },
     {
@@ -1305,7 +2122,7 @@
       "typeVersion": 3.4,
       "position": [
         624,
-        2560
+        4336
       ]
     },
     {
@@ -1339,7 +2156,7 @@
       "typeVersion": 2.2,
       "position": [
         0,
-        2944
+        4720
       ]
     },
     {
@@ -1349,7 +2166,7 @@
             {
               "id": "7b99f363-57ec-50f0-9f1f-4649e89113d2",
               "name": "speak",
-              "value": "={{ ({\"pl\": \"Przepraszam, czy mogą Państwo powtórzyć?\", \"es\": \"Disculpe, ¿puede repetirlo?\", \"de\": \"Entschuldigung, können Sie das wiederholen?\", \"en\": \"Sorry, could you repeat that?\"})[$json.language] || \"Sorry, could you repeat that?\" }}",
+              "value": "={{ (($('Prompts').first().json.prompts.find(p => p.key === 'repeat') || {})[$json.language] || ($('Prompts').first().json.prompts.find(p => p.key === 'repeat') || {}).en || '') }}",
               "type": "string"
             },
             {
@@ -1369,7 +2186,7 @@
       "typeVersion": 3.4,
       "position": [
         0,
-        3216
+        4992
       ]
     },
     {
@@ -1402,7 +2219,7 @@
       "typeVersion": 2.2,
       "position": [
         208,
-        2944
+        4720
       ]
     },
     {
@@ -1432,7 +2249,7 @@
       "typeVersion": 3.4,
       "position": [
         208,
-        3216
+        4992
       ]
     },
     {
@@ -1465,7 +2282,7 @@
       "typeVersion": 2.2,
       "position": [
         416,
-        2944
+        4720
       ]
     },
     {
@@ -1507,7 +2324,7 @@
       "typeVersion": 3.4,
       "position": [
         416,
-        3216
+        4992
       ]
     },
     {
@@ -1549,7 +2366,7 @@
       "typeVersion": 2.2,
       "position": [
         624,
-        2944
+        4720
       ]
     },
     {
@@ -1591,7 +2408,7 @@
       "typeVersion": 3.4,
       "position": [
         624,
-        3216
+        4992
       ]
     },
     {
@@ -1634,7 +2451,7 @@
       "typeVersion": 2.2,
       "position": [
         832,
-        2944
+        4720
       ]
     },
     {
@@ -1664,7 +2481,7 @@
       "typeVersion": 3.4,
       "position": [
         832,
-        3216
+        4992
       ]
     },
     {
@@ -1789,7 +2606,7 @@
       "typeVersion": 3.4,
       "position": [
         1040,
-        2944
+        4720
       ]
     },
     {
@@ -1823,7 +2640,7 @@
             {
               "id": "15384691-ea29-5e55-b4b6-3be4402090fe",
               "name": "speak",
-              "value": "={{ ({\"pl\": \"Przepraszam, mam problem techniczny. Połączę Państwa z konsultantem.\", \"es\": \"Disculpe, tengo un problema técnico. Le paso con un agente.\", \"de\": \"Entschuldigung, ich habe ein technisches Problem. Ich verbinde Sie mit einem Mitarbeiter.\", \"en\": \"Sorry, I have a technical problem. I will connect you to a colleague.\"})[$('PrepareTurn').first().json.language] || \"Sorry, I have a technical problem. I will connect you to a colleague.\" }}",
+              "value": "={{ (($('Prompts').first().json.prompts.find(p => p.key === 'techError') || {})[$('PrepareTurn').first().json.language] || ($('Prompts').first().json.prompts.find(p => p.key === 'techError') || {}).en || '') }}",
               "type": "string"
             },
             {
@@ -1914,7 +2731,7 @@
       "typeVersion": 3.4,
       "position": [
         0,
-        3888
+        5664
       ]
     },
     {
@@ -1948,7 +2765,7 @@
       "typeVersion": 2.2,
       "position": [
         0,
-        3616
+        5392
       ]
     },
     {
@@ -2024,7 +2841,7 @@
       "typeVersion": 1.3,
       "position": [
         208,
-        3616
+        5392
       ]
     },
     {
@@ -2039,7 +2856,7 @@
       "typeVersion": 3.4,
       "position": [
         416,
-        3616
+        5392
       ]
     },
     {
@@ -2069,7 +2886,7 @@
       "typeVersion": 3.4,
       "position": [
         672,
-        3616
+        5392
       ]
     },
     {
@@ -2382,7 +3199,7 @@
       "typeVersion": 1.1,
       "position": [
         880,
-        3616
+        5392
       ],
       "alwaysOutputData": true
     },
@@ -2536,7 +3353,7 @@
       "typeVersion": 1.3,
       "position": [
         1088,
-        3616
+        5392
       ]
     },
     {
@@ -2553,14 +3370,14 @@
       "typeVersion": 1.5,
       "position": [
         1296,
-        3616
+        5392
       ]
     },
     {
       "parameters": {
         "content": "## Receive\n\nOne turn per call: sessionId, transcript, ASR confidence.",
         "width": 656,
-        "height": 624,
+        "height": 608,
         "color": 4
       },
       "id": "zone-01",
@@ -2569,14 +3386,14 @@
       "typeVersion": 1,
       "position": [
         -64,
-        -144
+        -128
       ]
     },
     {
       "parameters": {
-        "content": "## Load state\n\nThe session row and the market row are the only state the model sees.",
-        "width": 656,
-        "height": 624,
+        "content": "## Load state\n\nPrompts (goals, rules, spoken lines), the session row and the market row are the only state the model sees.",
+        "width": 1072,
+        "height": 608,
         "color": 3
       },
       "id": "zone-02",
@@ -2585,14 +3402,14 @@
       "typeVersion": 1,
       "position": [
         608,
-        -144
+        -128
       ]
     },
     {
       "parameters": {
-        "content": "## Reason\n\nPrepareTurn rebuilds the system prompt from facts and applies the yes/no gates. The agent has three tools, Postgres memory and a structured parser with auto-fix.",
-        "width": 832,
-        "height": 896,
+        "content": "## Gates and prompt\n\nYesNoGate: a deterministic yes or no in IDENTIFY, CONSENT and DEALER moves the state before the model runs, so a small model cannot loop on a confirmed question. The system prompt is rebuilt every turn from ar_prompts and the facts.",
+        "width": 1072,
+        "height": 1744,
         "color": 5
       },
       "id": "zone-03",
@@ -2606,9 +3423,9 @@
     },
     {
       "parameters": {
-        "content": "## Guards 1: gates\n\nThe model's output is clamped to the allowed values, then each rule is an If (the condition) and an Edit Fields (what it changes). Gates: a deterministic yes or no in IDENTIFY and CONSENT wins over the model.",
-        "width": 1280,
-        "height": 624,
+        "content": "## Reason\n\nThe agent has three tools, Postgres memory and a structured parser with auto-fix.",
+        "width": 832,
+        "height": 880,
         "color": 5
       },
       "id": "zone-04",
@@ -2617,13 +3434,13 @@
       "typeVersion": 1,
       "position": [
         -64,
-        1472
+        2320
       ]
     },
     {
       "parameters": {
-        "content": "## Guards 2: caller and booking\n\nCaller asks for a person: handoff. A booking claim without a confirmation code is replaced by a question. A booking made by a tool forces BOOKED.",
-        "width": 864,
+        "content": "## Guards 1: gates\n\nThe model's output is clamped to the allowed values, then each rule is an If (the condition) and an Edit Fields (what it changes). Gates: a deterministic yes or no in IDENTIFY and CONSENT wins over the model.",
+        "width": 1280,
         "height": 624,
         "color": 5
       },
@@ -2633,7 +3450,23 @@
       "typeVersion": 1,
       "position": [
         -64,
-        2144
+        3248
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Guards 2: caller and booking\n\nCaller asks for a person: handoff. A booking claim without a confirmation code is replaced by a question. A booking made by a tool forces BOOKED.",
+        "width": 864,
+        "height": 624,
+        "color": 5
+      },
+      "id": "zone-06",
+      "name": "zone-06",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        3920
       ]
     },
     {
@@ -2643,13 +3476,13 @@
         "height": 608,
         "color": 5
       },
-      "id": "zone-06",
-      "name": "zone-06",
+      "id": "zone-07",
+      "name": "zone-07",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
         -64,
-        2816
+        4592
       ]
     },
     {
@@ -2659,13 +3492,13 @@
         "height": 624,
         "color": 3
       },
-      "id": "zone-07",
-      "name": "zone-07",
+      "id": "zone-08",
+      "name": "zone-08",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
         -64,
-        3472
+        5248
       ]
     },
     {
@@ -2675,13 +3508,13 @@
         "height": 624,
         "color": 4
       },
-      "id": "zone-08",
-      "name": "zone-08",
+      "id": "zone-09",
+      "name": "zone-09",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
         608,
-        3472
+        5248
       ]
     },
     {
@@ -2697,7 +3530,7 @@
       "typeVersion": 1,
       "position": [
         -64,
-        -416
+        -400
       ]
     },
     {
@@ -2713,11 +3546,174 @@
       "typeVersion": 1,
       "position": [
         848,
-        -416
+        -400
       ]
     }
   ],
   "connections": {
+    "LoadPrompts": {
+      "main": [
+        [
+          {
+            "node": "Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LoadMarket": {
+      "main": [
+        [
+          {
+            "node": "TurnFacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TurnFacts": {
+      "main": [
+        [
+          {
+            "node": "YesNoGate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YesNoGate": {
+      "main": [
+        [
+          {
+            "node": "OnIdentityFailed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OnIdentityFailed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OnIdentityConfirmed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OnConsentDeclined",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OnConsentGiven",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OnDealerAgreed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AssembleFacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnIdentityFailed": {
+      "main": [
+        [
+          {
+            "node": "AssembleFacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnIdentityConfirmed": {
+      "main": [
+        [
+          {
+            "node": "AssembleFacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnConsentDeclined": {
+      "main": [
+        [
+          {
+            "node": "AssembleFacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnConsentGiven": {
+      "main": [
+        [
+          {
+            "node": "AssembleFacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnDealerAgreed": {
+      "main": [
+        [
+          {
+            "node": "AssembleFacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AssembleFacts": {
+      "main": [
+        [
+          {
+            "node": "ComposeFacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ComposeFacts": {
+      "main": [
+        [
+          {
+            "node": "PrepareTurn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "FindDealers": {
       "ai_tool": [
         [
@@ -3184,7 +4180,7 @@
       "main": [
         [
           {
-            "node": "LoadSession",
+            "node": "LoadPrompts",
             "type": "main",
             "index": 0
           }
@@ -3192,6 +4188,17 @@
         [
           {
             "node": "RespondInvalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompts": {
+      "main": [
+        [
+          {
+            "node": "LoadSession",
             "type": "main",
             "index": 0
           }
@@ -3221,17 +4228,6 @@
         [
           {
             "node": "RespondNotFound",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "LoadMarket": {
-      "main": [
-        [
-          {
-            "node": "PrepareTurn",
             "type": "main",
             "index": 0
           }

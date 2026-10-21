@@ -12,12 +12,12 @@ branch instead of catching.
 
 | Workflow | Path | Nodes | What it does |
 |---|---|---|---|
-| AR-01 Session start | `POST ar/v1/session/start` | 19 | Parse UUI, idempotency on correlationId, load market, identify customer (AR-10), create case (AR-15), create session row, log, speak disclosure plus greeting. Backend down: handoff built by AR-14 |
-| AR-02 Dialogue turn | `POST ar/v1/session/turn` | 28 | Load session and market, rebuild the system prompt from facts, AI Agent with three tools and Postgres memory, structured output with auto-fix, deterministic guards, handoff build (AR-14), session update, log |
-| AR-03 Session end | `POST ar/v1/session/end` | 16 | Case outcome (Resolved, Delegated, Closed), confirmation if owed (AR-16), chat memory purge, session finalise, log |
-| AR-04 Transfer result | `POST ar/v1/session/transfer-result` | 9 | Record the REFER NOTIFY result; release, retry once, or end |
-| AR-05 Health and handoff lookup | `GET ar/v1/health`, `GET ar/v1/handoff?correlationId=` | 7 | Probe for the gateway and load balancer; handoff context for the agent desktop |
-| AR-90 Seed configuration | `POST ar/v1/admin/seed` | 7 | Upsert `ar_markets` and `ar_codes`; run once per environment |
+| AR-01 Session start | `POST ar/v1/session/start` | 23 | Parse UUI, idempotency on correlationId, load market, identify customer (AR-10), create case (AR-15), create session row, log, speak disclosure plus greeting. Backend down: handoff built by AR-14 |
+| AR-02 Dialogue turn | `POST ar/v1/session/turn` | 63 | Load prompts, session and market; `YesNoGate` Switch (deterministic yes or no in IDENTIFY, CONSENT, DEALER); system prompt rebuilt from `ar_prompts` and the facts; AI Agent with three tools and Postgres memory, structured output with auto-fix; guard chain of named If + Edit Fields pairs; handoff build (AR-14); session update; log |
+| AR-03 Session end | `POST ar/v1/session/end` | 21 | `CaseOutcome` Switch (Resolved, Delegated, Closed), confirmation text from `ar_prompts` if owed (AR-16), chat memory purge, session finalise, log |
+| AR-04 Transfer result | `POST ar/v1/session/transfer-result` | 14 | `TransferOutcome` Switch on the REFER NOTIFY result: release, retry once, or end; lines from `ar_prompts` |
+| AR-05 Health and handoff lookup | `GET ar/v1/health`, `GET ar/v1/handoff?correlationId=` | 6 | Probe for the gateway and load balancer; handoff context for the agent desktop |
+| AR-90 Seed configuration | `POST ar/v1/admin/seed` | 17 | Rows as JSON in Edit Fields nodes, Split Out, upsert into `ar_markets`, `ar_codes` and `ar_prompts`; run once per environment, safe to re-run |
 
 ## Tools and sub-workflows (Execute Workflow Trigger, typed inputs)
 
@@ -36,10 +36,10 @@ branch instead of catching.
 
 | Workflow | Endpoints | Stands in for |
 |---|---|---|
-| AR-MOCK-CRM | `ar-mock/crm/customer-lookup` | CRM / customer master (four synthetic customers: PL, ES, DE, GB) |
-| AR-MOCK-DealerBook | `ar-mock/dealerbook/dealers`, `slots`, `book`, `bookings`, `cancel` | DealerBook through the dealer booking API. Deterministic slots; `FULL` in a slotId simulates a taken slot; bookings persist in `ar_mock_bookings` |
-| AR-MOCK-CASE | `ar-mock/casesys/case` | CRM case REST; case numbers deterministic per correlation ID |
-| AR-MOCK-COMMS | `ar-mock/comms/send` | SMS and e-mail service; returns a message id, sends nothing |
+| AR-MOCK-CRM | `ar-mock/crm/customer-lookup` | CRM / customer master. Four synthetic customers (PL, ES, DE, GB) as rows in `ar_mock_customers`; the real build swaps the table read for one HTTP Request |
+| AR-MOCK-DealerBook | `ar-mock/dealerbook/dealers`, `slots`, `book`, `bookings`, `cancel` | DealerBook through the dealer booking API. Dealers as rows in `ar_mock_dealers`; deterministic slots (`GenerateSlots`, the one Code node kept in the mocks); `FULL` in a slotId simulates a taken slot; confirmation codes hashed from the idempotency key (Crypto node); bookings persist in `ar_mock_bookings` |
+| AR-MOCK-CASE | `ar-mock/casesys/case` | CRM case REST; case numbers from a SHA-256 of the correlation ID (Crypto node) |
+| AR-MOCK-COMMS | `ar-mock/comms/send` | SMS and e-mail service; `HasRequired` If, returns a message id, sends nothing |
 
 ## Operations
 
@@ -85,7 +85,18 @@ from BOOKED or WRAPUP), then `GuardResult`. The agent error path
 
 ## Tables
 
-`ar_sessions`, `ar_events`, `ar_markets`, `ar_codes` (n8n Data Tables),
-`ar_chat_memory` (Postgres, created by the memory node, purged per session by
-AR-03), `ar_mock_bookings`, `ar_mock_cases` (mocks). Columns in
+`ar_sessions`, `ar_events`, `ar_markets`, `ar_codes`, `ar_prompts` (n8n Data
+Tables), `ar_chat_memory` (Postgres, created by the memory node, purged per
+session by AR-03), `ar_mock_bookings`, `ar_mock_cases` (mocks). Columns in
 `02-technical-spec.md` section 8 and in `build/gen.py` `TABLE_COLS`.
+
+`ar_prompts` (added 2026-10-21) holds everything the assistant says or is
+told: one row per key, text per language in `pl`, `es`, `de`, `en` (English
+is the fallback), and a `note` saying where the row is used. Keys: `persona`,
+`rules`, `languageName`, `goal_<STATE>` for the nine states, `greeting`,
+`vehiclePhrase`, `notBooked`, `repeat`, `techError`, `confirmation`,
+`retryTransfer`, `transferFailed`. A wording change is one cell; the
+workflows read the table every call (one Data Table get plus one Aggregate
+node, `LoadPrompts` and `Prompts`). Seeded by AR-90 from `PROMPT_ROWS` in
+the generator; `build/setup.py --tables-only` adds the table, or any new
+column, to an instance that already runs the set.

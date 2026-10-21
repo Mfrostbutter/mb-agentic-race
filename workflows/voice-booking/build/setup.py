@@ -39,6 +39,7 @@ sys.path.insert(0, os.path.join(ROOT, "scripts"))
 import organize_workflows as org  # noqa: E402
 
 DRY = "--dry-run" in sys.argv
+TABLES_ONLY = "--tables-only" in sys.argv  # add new tables or columns to an existing instance; credentials and ids untouched
 IDS_PATH = os.environ.get("AR_IDS_FILE") or os.path.join(OUT, "lab-ids.json")
 
 
@@ -127,8 +128,18 @@ def ensure_tables(project, ids):
     for name, cols in gen.TABLE_COLS.items():
         cur = have.get(name)
         if cur:
-            print(f"data table '{name}': exists ({cur['id']})")
-            ids["dt_" + name] = cur["id"]; continue
+            ids["dt_" + name] = cur["id"]
+            code, detail = org.api(TARGET, "GET", f"/data-tables/{cur['id']}")
+            existing = {c["name"] for c in (detail.get("columns") or [])} if code == 200 else set(cols)
+            missing = [c for c in cols if c not in existing]
+            for c in missing:
+                if DRY:
+                    print(f"data table '{name}': would add column {c}"); continue
+                code, resp = org.api(TARGET, "POST", f"/data-tables/{cur['id']}/columns", {"name": c, "type": gen.coltype(c)})
+                if code not in (200, 201):
+                    sys.exit(f"data table '{name}' add column '{c}' FAILED HTTP {code}: {resp.get('error') or resp.get('message')}")
+            print(f"data table '{name}': exists ({cur['id']})" + (f", added columns {missing}" if missing and not DRY else ""))
+            continue
         if DRY:
             print(f"data table '{name}': would be created with {len(cols)} columns"); continue
         body = {"name": name, "columns": [{"name": c, "type": gen.coltype(c)} for c in cols]}
@@ -144,12 +155,14 @@ def ensure_tables(project, ids):
 def main():
     ids = json.load(open(IDS_PATH)) if os.path.exists(IDS_PATH) else {}
     project = project_record()
-    ensure_credentials(project, ids)
+    if not TABLES_ONLY:
+        ensure_credentials(project, ids)
     ensure_tables(project, ids)
-    ids.update({"project": PROJECT, "folder": FOLDER, "selfUrl": SELF_URL})
-    if MODEL:
-        ids["model"] = MODEL
-    ids["modelBaseUrl"] = MODEL_URL
+    if not TABLES_ONLY:
+        ids.update({"project": PROJECT, "folder": FOLDER, "selfUrl": SELF_URL})
+        if MODEL:
+            ids["model"] = MODEL
+        ids["modelBaseUrl"] = MODEL_URL
     if DRY:
         print("dry run: ids file not written"); return
     json.dump(ids, open(IDS_PATH, "w"), indent=2); open(IDS_PATH, "a").write("\n")

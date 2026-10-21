@@ -83,12 +83,40 @@
     },
     {
       "parameters": {
-        "jsCode": "const r = $json;\nconst dealers = (r.dealers || []).slice(0, 5);\nreturn [{ json: { ok: true, count: dealers.length, dealers, note: dealers.length ? 'Offer at most two by name. Dealers with bookable false cannot be booked here.' : 'No dealer matched. Ask for another city or offer the preferred dealer.' } }];"
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b97a5886-257f-529c-afe6-eef88599b49e",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "f6a5e2f5-a285-5771-bd2b-cd8926d6168e",
+              "name": "count",
+              "value": "={{ ($json.dealers || []).slice(0, 5).length }}",
+              "type": "number"
+            },
+            {
+              "id": "0ee022ce-719b-5e4a-adf3-c61dc018e255",
+              "name": "dealers",
+              "value": "={{ ($json.dealers || []).slice(0, 5) }}",
+              "type": "array"
+            },
+            {
+              "id": "e3038678-c2ad-53e2-a959-fec5dcf9364f",
+              "name": "note",
+              "value": "={{ ($json.dealers || []).length ? 'Offer at most two by name. Dealers with bookable false cannot be booked here.' : 'No dealer matched. Ask for another city or offer the preferred dealer.' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "dc51ca55-855f-5882-85ca-74dc01530782",
       "name": "ShapeDealers",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
         624,
         0

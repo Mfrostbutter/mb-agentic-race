@@ -27,14 +27,102 @@
     },
     {
       "parameters": {
-        "jsCode": "// Validates the gateway's session/start call and parses the inbound UUI. The raw string wins over pre-parsed fields.\nconst b = $json.body || {};\nconst u = b.uui || {};\nconst raw = String(u.raw || '');\nconst parts = raw ? raw.split(';') : [];\nconst version = String(parts[0] || u.version || '').trim();\nconst correlationId = String(parts[1] || b.correlationId || '').trim();\nconst vin = String(parts[2] || u.vin || '').trim().toUpperCase();\nconst msisdn = String(parts[3] || u.msisdn || '').trim();\nconst language = String(parts[4] || u.language || '').trim().toLowerCase().slice(0, 2);\nconst errors = [];\nif (!correlationId) errors.push('correlationId missing');\nif (version !== '1') errors.push('unsupported uui version: ' + (version || 'none'));\nconst byPrefix = [['+48', 'PL'], ['+34', 'ES'], ['+49', 'DE'], ['+44', 'GB']];\nlet market = String(b.market || '').toUpperCase();\nif (!market) { const hit = byPrefix.find(([p]) => msisdn.startsWith(p)); market = hit ? hit[1] : ''; }\nif (!market) market = ({ pl: 'PL', es: 'ES', de: 'DE', en: 'GB' })[language] || 'PL';\nreturn [{ json: { valid: errors.length === 0, statusCode: errors.length ? 400 : 200, error: errors.length ? 'validation_error' : null, message: errors.join('; ') || null,\n  correlationId, version, vin, msisdn, language, market, uuiRaw: raw, sipCallId: (b.sip || {}).callId || '', gatewayVendor: (b.gateway || {}).vendor || '', startedAt: Date.now() } }];"
+        "assignments": {
+          "assignments": [
+            {
+              "id": "66300dc1-74c2-565f-8a52-bf84ef994898",
+              "name": "uuiRaw",
+              "value": "={{ String(($json.body.uui || {}).raw || '') }}",
+              "type": "string"
+            },
+            {
+              "id": "d184d42c-d6bf-59f6-8051-bd66b6e62750",
+              "name": "version",
+              "value": "={{ String(String(($json.body.uui || {}).raw || '').split(';')[0] || ($json.body.uui || {}).version || '').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "d15e47ef-057a-57dd-b4f2-cf22b880b037",
+              "name": "correlationId",
+              "value": "={{ String(String(($json.body.uui || {}).raw || '').split(';')[1] || $json.body.correlationId || '').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "86b3738d-5cd2-5acd-b269-3a92c6d3d0c9",
+              "name": "vin",
+              "value": "={{ String(String(($json.body.uui || {}).raw || '').split(';')[2] || ($json.body.uui || {}).vin || '').trim().toUpperCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "ba3c3e94-c55e-5e6e-8a7e-b7d931d95bab",
+              "name": "msisdn",
+              "value": "={{ String(String(($json.body.uui || {}).raw || '').split(';')[3] || ($json.body.uui || {}).msisdn || '').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "1b99146f-c856-555e-890f-6de3ef543e48",
+              "name": "language",
+              "value": "={{ String(String(($json.body.uui || {}).raw || '').split(';')[4] || ($json.body.uui || {}).language || '').trim().toLowerCase().slice(0, 2) }}",
+              "type": "string"
+            },
+            {
+              "id": "ba7fb998-146c-5d82-986e-ae40ef0f91e8",
+              "name": "sipCallId",
+              "value": "={{ String(($json.body.sip || {}).callId || '') }}",
+              "type": "string"
+            },
+            {
+              "id": "0bf5cffe-edec-5d37-8b65-9b975f4eea01",
+              "name": "gatewayVendor",
+              "value": "={{ String(($json.body.gateway || {}).vendor || '') }}",
+              "type": "string"
+            },
+            {
+              "id": "15c49e24-4727-565d-ae67-b5cf07a26c3a",
+              "name": "startedAt",
+              "value": "={{ Date.now() }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "ab0da74a-79e8-52fd-9604-8beae975ae91",
       "name": "ParseStart",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
         208,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9e951955-57a9-50f6-9cf2-f10b8f982ca8",
+              "name": "market",
+              "value": "={{ String($('ReceiveStart').first().json.body.market || '').toUpperCase() || ({ '+48': 'PL', '+34': 'ES', '+49': 'DE', '+44': 'GB' })[$json.msisdn.slice(0, 3)] || ({ pl: 'PL', es: 'ES', de: 'DE', en: 'GB' })[$json.language] || 'PL' }}",
+              "type": "string"
+            },
+            {
+              "id": "f65720b3-1a12-5855-93e7-43d0f433cfc7",
+              "name": "message",
+              "value": "={{ [!$json.correlationId ? 'correlationId missing' : '', $json.version !== '1' ? 'unsupported uui version: ' + ($json.version || 'none') : ''].filter(Boolean).join('; ') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "08aaa266-5313-5cea-806e-001a51a56dbc",
+      "name": "ResolveMarket",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
         0
       ]
     },
@@ -50,12 +138,21 @@
           "conditions": [
             {
               "id": "7b2416c1-67e1-55e8-a2ce-a3cb3c20f630",
-              "leftValue": "={{ $json.valid }}",
+              "leftValue": "={{ $json.correlationId }}",
               "rightValue": "",
               "operator": {
-                "type": "boolean",
-                "operation": "true",
+                "type": "string",
+                "operation": "notEmpty",
                 "singleValue": true
+              }
+            },
+            {
+              "id": "f109139a-bde0-5916-8992-21571a2d033f",
+              "leftValue": "={{ $json.version }}",
+              "rightValue": "1",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
               }
             }
           ],
@@ -68,16 +165,16 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        416,
+        624,
         0
       ]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ error: $json.error, message: $json.message }) }}",
+        "responseBody": "={{ JSON.stringify({ error: 'validation_error', message: $json.message }) }}",
         "options": {
-          "responseCode": "={{ $json.statusCode }}"
+          "responseCode": 400
         }
       },
       "id": "a9748d5d-0cf5-5de3-b81c-5f49ae1c15bb",
@@ -85,8 +182,42 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        416,
+        624,
         272
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PENDING"
+        },
+        "returnAll": true
+      },
+      "id": "e2d369fc-c77f-578c-88d4-e8481a78230d",
+      "name": "LoadPrompts",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "prompts",
+        "options": {}
+      },
+      "id": "d5db09e6-a721-5451-b34a-ad31c45a9711",
+      "name": "Prompts",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        0
       ]
     },
     {
@@ -103,7 +234,7 @@
             {
               "keyName": "correlationId",
               "condition": "eq",
-              "keyValue": "={{ $json.correlationId }}"
+              "keyValue": "={{ $('ResolveMarket').first().json.correlationId }}"
             }
           ]
         },
@@ -115,7 +246,7 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        672,
+        1296,
         0
       ],
       "alwaysOutputData": true
@@ -150,20 +281,22 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        880,
+        1504,
         0
       ]
     },
     {
       "parameters": {
-        "jsCode": "const s = $json;\nreturn [{ json: { sessionId: s.sessionId, correlationId: s.correlationId, caseId: s.caseId, market: s.market, language: s.language, state: s.state, customer: { known: !!s.customerRef, greetingName: s.greetingName, vehicle: s.vehicleLabel }, speak: '', action: 'continue', handoff: null, listen: true, duplicate: true } }];"
+        "mode": "raw",
+        "jsonOutput": "={{ { sessionId: $json.sessionId, correlationId: $json.correlationId, caseId: $json.caseId, market: $json.market, language: $json.language, state: $json.state, customer: { known: !!$json.customerRef, greetingName: $json.greetingName, vehicle: $json.vehicleLabel }, speak: '', action: 'continue', handoff: null, listen: true, duplicate: true } }}",
+        "options": {}
       },
       "id": "0033ac2a-2b66-563b-930f-0be43296327e",
       "name": "ShapeExisting",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
-        672,
+        1296,
         272
       ]
     },
@@ -180,7 +313,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        880,
+        1504,
         272
       ]
     },
@@ -198,7 +331,7 @@
             {
               "keyName": "market",
               "condition": "eq",
-              "keyValue": "={{ $('ParseStart').first().json.market }}"
+              "keyValue": "={{ $('ResolveMarket').first().json.market }}"
             }
           ]
         },
@@ -210,8 +343,8 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        1136,
-        0
+        0,
+        672
       ],
       "alwaysOutputData": true
     },
@@ -276,8 +409,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        1344,
-        0
+        208,
+        672
       ]
     },
     {
@@ -396,20 +529,178 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        1552,
-        0
+        416,
+        672
       ]
     },
     {
       "parameters": {
-        "jsCode": "// Creates the session row content, the greeting and the first instruction for the gateway.\nconst p = $('ParseStart').first().json;\nconst m = $('LoadMarket').first().json;\nconst c = $('IdentifyCustomer').first().json;\nconst k = $('CreateCase').first().json;\nconst alphabet = 'ABCDEFGHJKMNPQRSTVWXYZ23456789';\nlet sessionId = ''; for (let i = 0; i < 8; i++) sessionId += alphabet[Math.floor(Math.random() * alphabet.length)];\nconst langs = String(m.languages || '').split(',').map(x => x.trim());\nconst language = p.language && langs.includes(p.language) ? p.language : (m.defaultLanguage || 'en');\nconst disclosure = m['disclosure_' + language] || m.disclosure_en || '';\nconst known = !!(c.ok && c.known);\nconst name = known ? c.greetingName : '';\nconst veh = known ? c.vehicleLabel : '';\nconst greetings = {\n  pl: `Dzień dobry${name ? ', ' + name : ''}. W czym mogę pomóc w związku z wizytą serwisową${veh ? ' dla Państwa ' + veh : ''}?`,\n  es: `Buenos días${name ? ', ' + name : ''}. ¿En qué puedo ayudarle con su cita de taller${veh ? ' para su ' + veh : ''}?`,\n  de: `Guten Tag${name ? ', ' + name : ''}. Wie kann ich Ihnen bei Ihrem Werkstatttermin${veh ? ' für Ihren ' + veh : ''} helfen?`,\n  en: `Hello${name ? ', ' + name : ''}. How can I help with your service appointment${veh ? ' for your ' + veh : ''}?`\n};\nconst backendDown = c.ok === false || k.ok === false;\nreturn [{ json: { sessionId, correlationId: p.correlationId, caseId: k.caseId || '', market: m.market || p.market, language,\n  state: backendDown ? 'HANDOFF' : 'IDENTIFY', intent: 'UNKNOWN', customerRef: known ? c.customerRef : '', vehicleRef: p.vin,\n  greetingName: name, vehicleLabel: veh, dealerId: known ? (c.preferredDealerId || '') : '', dealerName: known ? (c.preferredDealerName || '') : '',\n  offeredSlots: '[]', turns: 0, startedAt: new Date(p.startedAt).toISOString(), known, backendDown,\n  handoffReason: backendDown ? 'BACKEND_UNAVAILABLE' : '',\n  speak: backendDown ? (m.handoverLine || '') : (disclosure + ' ' + (greetings[language] || greetings.en)).trim() } }];"
+        "action": "generate",
+        "encodingType": "hex",
+        "stringLength": 8,
+        "dataPropertyName": "sessionId"
+      },
+      "id": "33a601bb-b7af-53ea-97db-aabba287d76e",
+      "name": "GenerateSessionId",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        672,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cd058872-5c93-57b3-9abd-e9adae726809",
+              "name": "sessionId",
+              "value": "={{ String($json.sessionId).toUpperCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "2209fc05-0a62-520e-8397-feb42b43ba7a",
+              "name": "correlationId",
+              "value": "={{ $('ParseStart').first().json.correlationId }}",
+              "type": "string"
+            },
+            {
+              "id": "9fd7bb35-46dd-5dd7-b13d-386729771f16",
+              "name": "caseId",
+              "value": "={{ $('CreateCase').first().json.caseId || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "3fb89255-2bb3-528d-9a03-b302637ea76e",
+              "name": "market",
+              "value": "={{ $('LoadMarket').first().json.market || $('ResolveMarket').first().json.market }}",
+              "type": "string"
+            },
+            {
+              "id": "d987e08e-d1cc-5cd3-8b3c-ed0f0323b0c2",
+              "name": "language",
+              "value": "={{ $('ParseStart').first().json.language && String($('LoadMarket').first().json.languages || '').split(',').map(x => x.trim()).includes($('ParseStart').first().json.language) ? $('ParseStart').first().json.language : ($('LoadMarket').first().json.defaultLanguage || 'en') }}",
+              "type": "string"
+            },
+            {
+              "id": "ed1bf679-847e-5b58-9d45-7b5a2b6d32bc",
+              "name": "backendDown",
+              "value": "={{ $('IdentifyCustomer').first().json.ok === false || $('CreateCase').first().json.ok === false }}",
+              "type": "boolean"
+            },
+            {
+              "id": "db1d24ee-9990-5cd5-9934-961e3417ab15",
+              "name": "state",
+              "value": "={{ ($('IdentifyCustomer').first().json.ok === false || $('CreateCase').first().json.ok === false) ? 'HANDOFF' : 'IDENTIFY' }}",
+              "type": "string"
+            },
+            {
+              "id": "835fe29e-615d-5d9b-a7b9-bd1c06683648",
+              "name": "intent",
+              "value": "UNKNOWN",
+              "type": "string"
+            },
+            {
+              "id": "3377f4d9-1f52-5571-9294-a250272e03e6",
+              "name": "handoffReason",
+              "value": "={{ ($('IdentifyCustomer').first().json.ok === false || $('CreateCase').first().json.ok === false) ? 'BACKEND_UNAVAILABLE' : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "b51981d5-d044-5efa-b30f-de7b5c6dfcda",
+              "name": "known",
+              "value": "={{ !!($('IdentifyCustomer').first().json.ok && $('IdentifyCustomer').first().json.known) }}",
+              "type": "boolean"
+            },
+            {
+              "id": "cc5bc8fb-27c5-5902-8297-7d932ce703e4",
+              "name": "customerRef",
+              "value": "={{ ($('IdentifyCustomer').first().json.ok && $('IdentifyCustomer').first().json.known) ? ($('IdentifyCustomer').first().json.customerRef || '') : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "7e436cd4-11dd-5db7-85f4-02cf8d692590",
+              "name": "vehicleRef",
+              "value": "={{ $('ParseStart').first().json.vin }}",
+              "type": "string"
+            },
+            {
+              "id": "90e32531-455f-58f1-8659-608d5b555731",
+              "name": "greetingName",
+              "value": "={{ ($('IdentifyCustomer').first().json.ok && $('IdentifyCustomer').first().json.known) ? ($('IdentifyCustomer').first().json.greetingName || '') : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "592cbddf-d511-5e9b-9dd8-560a7d7c2fe9",
+              "name": "vehicleLabel",
+              "value": "={{ ($('IdentifyCustomer').first().json.ok && $('IdentifyCustomer').first().json.known) ? ($('IdentifyCustomer').first().json.vehicleLabel || '') : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "b95c8467-fdc1-5559-884e-45dec49bf932",
+              "name": "dealerId",
+              "value": "={{ ($('IdentifyCustomer').first().json.ok && $('IdentifyCustomer').first().json.known) ? ($('IdentifyCustomer').first().json.preferredDealerId || '') : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "04fd2f32-b93e-5127-a9ef-86f8309cbb25",
+              "name": "dealerName",
+              "value": "={{ ($('IdentifyCustomer').first().json.ok && $('IdentifyCustomer').first().json.known) ? ($('IdentifyCustomer').first().json.preferredDealerName || '') : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "cc9b96ac-48a6-5e5a-b3b2-736661f3b110",
+              "name": "offeredSlots",
+              "value": "[]",
+              "type": "string"
+            },
+            {
+              "id": "dbe42c35-3d77-5e12-afa6-060cab6e9020",
+              "name": "turns",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "882855be-04f9-5da0-aea6-821e0a60c4d7",
+              "name": "startedAt",
+              "value": "={{ new Date($('ParseStart').first().json.startedAt).toISOString() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "57ecd0e6-d6a1-54b3-b70b-bf4531096f1a",
       "name": "ComposeSession",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
-        0,
+        880,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "52b77377-1506-598e-bbf0-f01fbc8354fa",
+              "name": "speak",
+              "value": "={{ $json.backendDown ? ($('LoadMarket').first().json.handoverLine || '') : (($('LoadMarket').first().json['disclosure_' + $json.language] || $('LoadMarket').first().json.disclosure_en || '') + ' ' + (($('Prompts').first().json.prompts.find(p => p.key === 'greeting') || {})[$json.language] || ($('Prompts').first().json.prompts.find(p => p.key === 'greeting') || {}).en || '').replace('{name}', $json.greetingName ? ', ' + $json.greetingName : '').replace('{vehicle}', $json.vehicleLabel ? (($('Prompts').first().json.prompts.find(p => p.key === 'vehiclePhrase') || {})[$json.language] || ($('Prompts').first().json.prompts.find(p => p.key === 'vehiclePhrase') || {}).en || '').replace('{vehicle}', $json.vehicleLabel) : '')).trim() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "cfe4c23c-1814-5866-b8a6-233f221c6c64",
+      "name": "ComposeGreeting",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1088,
         672
       ]
     },
@@ -724,7 +1015,7 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        208,
+        1296,
         672
       ]
     },
@@ -877,7 +1168,7 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        416,
+        1504,
         672
       ]
     },
@@ -911,8 +1202,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        672,
-        672
+        0,
+        1072
       ]
     },
     {
@@ -987,21 +1278,23 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        880,
-        944
+        208,
+        1344
       ]
     },
     {
       "parameters": {
-        "jsCode": "// Response contract for session/start (section 4.1 of the spec).\nconst s = $('ComposeSession').first().json;\nlet handoff = null;\nif (s.backendDown) { try { const h = $('BuildStartHandoff').first().json; handoff = { intent: 'UNKNOWN', handoffReason: 'BACKEND_UNAVAILABLE', caseId: s.caseId, uuiPayload: h.uuiPayload, uuiHex: h.uuiHex, uuiAscii: h.uuiAscii, referTo: h.referTo }; } catch (e) { handoff = { intent: 'UNKNOWN', handoffReason: 'BACKEND_UNAVAILABLE', caseId: s.caseId, error: 'handoff_build_failed' }; } }\nreturn [{ json: { sessionId: s.sessionId, correlationId: s.correlationId, caseId: s.caseId, market: s.market, language: s.language, state: s.state,\n  customer: { known: s.known, greetingName: s.greetingName, vehicle: s.vehicleLabel }, speak: s.speak, action: s.backendDown ? 'handoff' : 'continue', handoff, listen: !s.backendDown, latencyMs: Date.now() - new Date(s.startedAt).getTime() } }];"
+        "mode": "raw",
+        "jsonOutput": "={{ (s => ({ sessionId: s.sessionId, correlationId: s.correlationId, caseId: s.caseId, market: s.market, language: s.language, state: s.state, customer: { known: s.known, greetingName: s.greetingName, vehicle: s.vehicleLabel }, speak: s.speak, action: s.backendDown ? 'handoff' : 'continue', handoff: s.backendDown ? { intent: 'UNKNOWN', handoffReason: 'BACKEND_UNAVAILABLE', caseId: s.caseId, uuiPayload: $json.uuiPayload, uuiHex: $json.uuiHex, uuiAscii: $json.uuiAscii, referTo: $json.referTo, error: $json.ok === false ? ($json.error || 'handoff_build_failed') : undefined } : null, listen: !s.backendDown, latencyMs: Date.now() - new Date(s.startedAt).getTime() }))($('ComposeGreeting').first().json) }}",
+        "options": {}
       },
       "id": "29ba2996-1a3f-542c-a9bb-d0188c5706c8",
       "name": "ShapeStart",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
-        880,
-        672
+        208,
+        1072
       ]
     },
     {
@@ -1017,15 +1310,15 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        1088,
-        672
+        416,
+        1072
       ]
     },
     {
       "parameters": {
-        "content": "## Receive\n\nThe gateway posts the SIP UUI once the INVITE is answered. Header auth; a malformed body answers 400 and the call is released.",
-        "width": 656,
-        "height": 624,
+        "content": "## Receive\n\nThe gateway posts the SIP UUI once the INVITE is answered. Header auth. ParseStart splits the raw UUI; ResolveMarket: gateway value, phone prefix, language, PL. A missing correlationId or a UUI version other than 1 answers 400 and the call is released.",
+        "width": 864,
+        "height": 656,
         "color": 4
       },
       "id": "zone-01",
@@ -1034,14 +1327,14 @@
       "typeVersion": 1,
       "position": [
         -64,
-        -144
+        -176
       ]
     },
     {
       "parameters": {
-        "content": "## Idempotency\n\nA re-delivered correlationId returns the existing session without speaking again.",
-        "width": 448,
-        "height": 624,
+        "content": "## Idempotency\n\nPrompts are loaded once. A re-delivered correlationId returns the existing session without speaking again.",
+        "width": 864,
+        "height": 656,
         "color": 5
       },
       "id": "zone-02",
@@ -1049,15 +1342,15 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        608,
-        -144
+        816,
+        -176
       ]
     },
     {
       "parameters": {
         "content": "## Identify and open the case\n\nMarket row, CRM lookup by VIN, case. The model never sees the VIN or the number.",
         "width": 656,
-        "height": 624,
+        "height": 352,
         "color": 3
       },
       "id": "zone-03",
@@ -1065,15 +1358,15 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        1072,
-        -144
+        -64,
+        528
       ]
     },
     {
       "parameters": {
-        "content": "## Session\n\nOne row in ar_sessions per call; state starts at IDENTIFY. Every start is logged to ar_events.",
-        "width": 656,
-        "height": 624,
+        "content": "## Session\n\nRandom session id, one row in ar_sessions per call, state starts at IDENTIFY. The greeting is the market's disclosure plus the ar_prompts greeting in the session language. Every start is logged to ar_events.",
+        "width": 1072,
+        "height": 352,
         "color": 3
       },
       "id": "zone-04",
@@ -1081,7 +1374,7 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -64,
+        608,
         528
       ]
     },
@@ -1097,8 +1390,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        608,
-        528
+        -64,
+        928
       ]
     },
     {
@@ -1114,11 +1407,22 @@
       "typeVersion": 1,
       "position": [
         -64,
-        -416
+        -448
       ]
     }
   ],
   "connections": {
+    "LoadPrompts": {
+      "main": [
+        [
+          {
+            "node": "Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "ReceiveStart": {
       "main": [
         [
@@ -1134,6 +1438,17 @@
       "main": [
         [
           {
+            "node": "ResolveMarket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ResolveMarket": {
+      "main": [
+        [
+          {
             "node": "IsValid",
             "type": "main",
             "index": 0
@@ -1145,7 +1460,7 @@
       "main": [
         [
           {
-            "node": "CheckExisting",
+            "node": "LoadPrompts",
             "type": "main",
             "index": 0
           }
@@ -1153,6 +1468,17 @@
         [
           {
             "node": "RespondInvalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompts": {
+      "main": [
+        [
+          {
+            "node": "CheckExisting",
             "type": "main",
             "index": 0
           }
@@ -1225,6 +1551,17 @@
       "main": [
         [
           {
+            "node": "GenerateSessionId",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GenerateSessionId": {
+      "main": [
+        [
+          {
             "node": "ComposeSession",
             "type": "main",
             "index": 0
@@ -1233,6 +1570,17 @@
       ]
     },
     "ComposeSession": {
+      "main": [
+        [
+          {
+            "node": "ComposeGreeting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ComposeGreeting": {
       "main": [
         [
           {

@@ -3,14 +3,25 @@
   "zones": [
     {
       "title": "Seed",
-      "body": "Upserts ar_markets and ar_codes. Run once per environment; safe to re-run.",
+      "body": "Rows live in the Edit Fields nodes as JSON; Split Out makes one item per row; upserts are keyed on the natural key. Run once per environment; safe to re-run.",
       "color": 6,
       "nodes": [
         "ReceiveSeed",
         "MarketRows",
+        "SplitMarkets",
         "UpsertMarket",
         "CodeRows",
+        "SplitCodes",
         "UpsertCode",
+        "PromptRows",
+        "SplitPrompts",
+        "UpsertPrompt",
+        "MockCustomerRows",
+        "SplitMockCustomers",
+        "UpsertMockCustomer",
+        "MockDealerRows",
+        "SplitMockDealers",
+        "UpsertMockDealer",
         "RespondSeeded"
       ]
     }
@@ -18,7 +29,7 @@
   "panels": [
     {
       "title": "AR-90 Seed config",
-      "body": "Markets and codes are data, not prompt text: a new market is one row here. Disclosure texts are placeholders until Legal supplies the market wording.",
+      "body": "Markets, codes and prompts are data, not code: a new market is one row, a wording change is one cell. Disclosure texts are placeholders until Legal supplies the market wording.",
       "color": 6,
       "width": 768
     }

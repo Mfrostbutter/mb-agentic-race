@@ -20,14 +20,58 @@
     },
     {
       "parameters": {
-        "jsCode": "// Mock of dealer search. Real build: dealer booking API or the dealer directory.\nconst b = $json.body || {};\nconst all = [\n  { dealerId: 'PL-WAW-01', name: 'Dealer Warszawa Okęcie', city: 'Warszawa', market: 'PL', bookable: true },\n  { dealerId: 'PL-WAW-02', name: 'Dealer Warszawa Wola', city: 'Warszawa', market: 'PL', bookable: true },\n  { dealerId: 'PL-KRK-01', name: 'Dealer Kraków', city: 'Kraków', market: 'PL', bookable: true },\n  { dealerId: 'PL-GDA-01', name: 'Dealer Gdańsk', city: 'Gdańsk', market: 'PL', bookable: false },\n  { dealerId: 'ES-MAD-02', name: 'Dealer Madrid Castellana', city: 'Madrid', market: 'ES', bookable: true },\n  { dealerId: 'ES-BCN-01', name: 'Dealer Barcelona', city: 'Barcelona', market: 'ES', bookable: true },\n  { dealerId: 'DE-STR-01', name: 'Dealer Stuttgart Mitte', city: 'Stuttgart', market: 'DE', bookable: true },\n  { dealerId: 'GB-LON-01', name: 'Dealer London West', city: 'London', market: 'GB', bookable: true }\n];\nconst market = String(b.market || '').toUpperCase();\nconst city = String(b.city || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\nlet hits = all.filter(d => !market || d.market === market);\nif (b.dealerId) hits = hits.filter(d => d.dealerId === b.dealerId);\nif (city) hits = hits.filter(d => d.city.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').includes(city));\nreturn [{ json: { dealers: hits } }];"
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PENDING"
+        },
+        "returnAll": true
+      },
+      "id": "98540e04-dd15-54e9-ad22-6b7fe14a9f82",
+      "name": "LoadDealers",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "dealers",
+        "options": {}
+      },
+      "id": "9bdd45f6-c02d-595c-a664-7ef2b88df173",
+      "name": "AllDealers",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        416,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "94fddad7-5e2e-52e0-9269-deb41838cb7a",
+              "name": "dealers",
+              "value": "={{ $json.dealers.filter(d => (!$('ReceiveDealers').first().json.body.market || d.market === String($('ReceiveDealers').first().json.body.market).toUpperCase()) && (!$('ReceiveDealers').first().json.body.dealerId || d.dealerId === $('ReceiveDealers').first().json.body.dealerId) && (!$('ReceiveDealers').first().json.body.city || String(d.city || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').includes(String($('ReceiveDealers').first().json.body.city || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '')))).map(d => ({ dealerId: d.dealerId, name: d.name, city: d.city, market: d.market, bookable: d.bookable === true })) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "f32e5d08-503f-56a2-a3e2-e61cbefbdc3c",
       "name": "FilterDealers",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
-        208,
+        624,
         0
       ]
     },
@@ -44,7 +88,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        416,
+        832,
         0
       ]
     },
@@ -60,22 +104,53 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        672,
-        0
+        0,
+        400
       ],
       "webhookId": "8f384ade-2445-5c2c-bd6f-a2551239eade"
     },
     {
       "parameters": {
-        "jsCode": "// Mock of DealerBook slot availability. Deterministic from dealerId and date so tests repeat.\nconst b = $json.body || {};\nconst dealerId = String(b.dealerId || '');\nconst names = { 'PL-WAW-01': 'Dealer Warszawa Okęcie', 'PL-WAW-02': 'Dealer Warszawa Wola', 'PL-KRK-01': 'Dealer Kraków', 'ES-MAD-02': 'Dealer Madrid Castellana', 'ES-BCN-01': 'Dealer Barcelona', 'DE-STR-01': 'Dealer Stuttgart Mitte', 'GB-LON-01': 'Dealer London West' };\nif (!names[dealerId]) return [{ json: { dealerId, dealerName: null, slots: [], reason: 'dealer_not_dealerbook_enabled' } }];\nlet from = new Date(b.fromDate || Date.now());\nif (isNaN(from.getTime())) from = new Date();\nfrom.setUTCHours(0, 0, 0, 0);\nconst seed = [...dealerId].reduce((a, ch) => a + ch.charCodeAt(0), 0);\nconst times = ['08:00', '10:30', '14:00'];\nconst slots = [];\nfor (let d = 1; d <= 10 && slots.length < 6; d++) {\n  const day = new Date(from.getTime() + d * 86400000);\n  if (day.getUTCDay() === 0) continue;\n  times.forEach((t, i) => { if ((seed + d + i) % 3 !== 0) slots.push({ slotId: `${dealerId}-${day.toISOString().slice(0,10).replace(/-/g,'')}-${t.replace(':','')}`, startsAt: `${day.toISOString().slice(0,10)}T${t}:00`, dealerId }); });\n}\nreturn [{ json: { dealerId, dealerName: names[dealerId], slots: slots.slice(0, 6) } }];"
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PENDING"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "dealerId",
+              "condition": "eq",
+              "keyValue": "={{ String($json.body.dealerId || '') }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "id": "0d768dac-3699-57d2-9e43-f8f08116501f",
+      "name": "LoadDealer",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        400
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mock of DealerBook slot availability. Deterministic from dealerId and date so tests repeat. The dealer row comes from ar_mock_dealers (LoadDealer).\nconst b = $('ReceiveSlots').first().json.body || {};\nconst dealer = $json;\nconst dealerId = String(b.dealerId || '');\nif (!dealer.dealerId || dealer.bookable !== true) return [{ json: { dealerId, dealerName: dealer.name || null, slots: [], reason: 'dealer_not_dealerbook_enabled' } }];\nlet from = new Date(b.fromDate || Date.now());\nif (isNaN(from.getTime())) from = new Date();\nfrom.setUTCHours(0, 0, 0, 0);\nconst seed = [...dealerId].reduce((a, ch) => a + ch.charCodeAt(0), 0);\nconst times = ['08:00', '10:30', '14:00'];\nconst slots = [];\nfor (let d = 1; d <= 10 && slots.length < 6; d++) {\n  const day = new Date(from.getTime() + d * 86400000);\n  if (day.getUTCDay() === 0) continue;\n  times.forEach((t, i) => { if ((seed + d + i) % 3 !== 0) slots.push({ slotId: `${dealerId}-${day.toISOString().slice(0,10).replace(/-/g,'')}-${t.replace(':','')}`, startsAt: `${day.toISOString().slice(0,10)}T${t}:00`, dealerId }); });\n}\nreturn [{ json: { dealerId, dealerName: dealer.name, slots: slots.slice(0, 6) } }];"
       },
       "id": "05bbcf08-a4e3-51b2-9273-1991ea7429f8",
       "name": "GenerateSlots",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        880,
-        0
+        416,
+        400
       ]
     },
     {
@@ -91,8 +166,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        1088,
-        0
+        624,
+        400
       ]
     },
     {
@@ -108,21 +183,271 @@
       "typeVersion": 2.1,
       "position": [
         0,
-        384
+        784
       ],
       "webhookId": "9afd4e4c-572f-5f5f-9b75-dde7d3159e3f"
     },
     {
       "parameters": {
-        "jsCode": "// Mock of DealerBook booking. Idempotent on idempotencyKey; a slotId containing FULL simulates a slot taken in the meantime.\nconst b = $json.body || {};\nconst key = String(b.idempotencyKey || '');\nconst slotId = String(b.slotId || '');\nif (!key || !slotId || !b.dealerId) return [{ json: { conflict: false, invalid: true, message: 'slotId, dealerId and idempotencyKey are required' } }];\nif (/FULL/.test(slotId)) return [{ json: { conflict: true, message: 'slot no longer available' } }];\nlet h = 0; for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0;\nconst code = 'BK-' + (h % 1000000).toString().padStart(6, '0');\nconst m = slotId.match(/-(\\d{8})-(\\d{4})$/);\nconst startsAt = m ? `${m[1].slice(0,4)}-${m[1].slice(4,6)}-${m[1].slice(6,8)}T${m[2].slice(0,2)}:${m[2].slice(2,4)}:00` : '';\nreturn [{ json: { conflict: false, invalid: false, bookingRef: key, confirmationCode: code, slotId, dealerId: b.dealerId, vin: b.vin || '', serviceType: b.serviceType || '', mobility: b.mobility || '', startsAt, status: 'booked', bookedAt: new Date().toISOString() } }];"
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "87dfbddc-4f0d-522f-b50c-4c59487f5bc0",
+              "leftValue": "={{ String($json.body.idempotencyKey || '') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "673030ce-80f9-58f3-8738-6b24865bc0ff",
+              "leftValue": "={{ String($json.body.slotId || '') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "2536f546-dcca-5049-91d1-d5d9abbc1459",
+              "leftValue": "={{ String($json.body.dealerId || '') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "7fe75a9e-9e95-5ad8-8986-b12ec2e5390d",
+      "name": "BookInvalid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        208,
+        784
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d5b43a09-0718-5f50-8145-044cc9b9db0f",
+              "name": "conflict",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "444aec75-1253-56f1-bd1d-e740e6680289",
+              "name": "invalid",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "76354468-56e2-5230-86fe-45e09a191cb8",
+              "name": "message",
+              "value": "slotId, dealerId and idempotencyKey are required",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "429b2044-d174-5634-aa50-e5a1ae663cdc",
+      "name": "ReplyInvalid",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        1056
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "03961766-8f23-52a6-bfc4-f9d4cd472841",
+              "leftValue": "={{ String($json.body.slotId || '') }}",
+              "rightValue": "FULL",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0d12b75d-a925-501a-bb99-b4371d97b027",
+      "name": "SlotFull",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        416,
+        784
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bdf2888d-bc01-5542-ad3e-f1ca8014072b",
+              "name": "conflict",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "8cfe7d8a-b55c-5195-ba6e-1dc67ecb5fd4",
+              "name": "invalid",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "f9474d8a-9610-5ad2-9cec-6cfeaa4d88ec",
+              "name": "message",
+              "value": "slot no longer available",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7c834f76-3aa6-5bc9-a985-1cd90591cfbd",
+      "name": "ReplyConflict",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        1056
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hash",
+        "type": "SHA256",
+        "value": "={{ $json.body.idempotencyKey }}",
+        "dataPropertyName": "hash",
+        "encoding": "hex"
+      },
+      "id": "1d63c44b-28f7-5ab7-a122-fbcc2aeeab62",
+      "name": "HashKey",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        624,
+        784
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "77470b9a-fbe0-5234-91be-0ce5bb8ccab8",
+              "name": "conflict",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "26aa9617-99e3-5e0b-9481-84ab59ddca4c",
+              "name": "invalid",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "38ccb73d-3b15-5ebf-9a44-2014270c8cbc",
+              "name": "bookingRef",
+              "value": "={{ $json.body.idempotencyKey }}",
+              "type": "string"
+            },
+            {
+              "id": "fb7dd104-a07e-5717-9e73-74cb9a73e5f0",
+              "name": "confirmationCode",
+              "value": "={{ 'BK-' + (parseInt($json.hash.slice(0, 8), 16) % 1000000).toString().padStart(6, '0') }}",
+              "type": "string"
+            },
+            {
+              "id": "d7b66ad6-8615-52db-9c27-c0245dd3e35f",
+              "name": "slotId",
+              "value": "={{ $json.body.slotId }}",
+              "type": "string"
+            },
+            {
+              "id": "555cb41e-b464-5d27-8a55-1cf51278fb4a",
+              "name": "dealerId",
+              "value": "={{ $json.body.dealerId }}",
+              "type": "string"
+            },
+            {
+              "id": "09527bcd-69da-56e7-b4a9-9ba93058638d",
+              "name": "vin",
+              "value": "={{ $json.body.vin || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "8ffece94-3430-5158-888a-036a4d4481a6",
+              "name": "serviceType",
+              "value": "={{ $json.body.serviceType || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "fdf20a7f-e028-539a-a57f-2ea7807dec45",
+              "name": "mobility",
+              "value": "={{ $json.body.mobility || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "fc9220f2-63f1-55c3-a3b8-8d74d45bc217",
+              "name": "startsAt",
+              "value": "={{ (m => m ? m[1].slice(0, 4) + '-' + m[1].slice(4, 6) + '-' + m[1].slice(6, 8) + 'T' + m[2].slice(0, 2) + ':' + m[2].slice(2, 4) + ':00' : '')(String($json.body.slotId).match(/-(\\d{8})-(\\d{4})$/)) }}",
+              "type": "string"
+            },
+            {
+              "id": "1ddbb490-2266-55bc-b7f2-f60a6dcf6bf5",
+              "name": "status",
+              "value": "booked",
+              "type": "string"
+            },
+            {
+              "id": "760eb5c4-43df-5cbe-a28c-15a151f21b33",
+              "name": "bookedAt",
+              "value": "={{ $now.toUTC().toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "465dc2fd-ff59-5ae5-bcd4-a1275c7d12a3",
       "name": "ComputeBooking",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
-        208,
-        384
+        832,
+        784
       ]
     },
     {
@@ -155,8 +480,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        416,
-        384
+        1040,
+        784
       ]
     },
     {
@@ -172,8 +497,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        416,
-        656
+        1040,
+        1056
       ]
     },
     {
@@ -320,8 +645,8 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        624,
-        384
+        1248,
+        784
       ],
       "alwaysOutputData": true
     },
@@ -338,8 +663,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        832,
-        384
+        1456,
+        784
       ]
     },
     {
@@ -354,8 +679,8 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        0,
-        1040
+        672,
+        1440
       ],
       "webhookId": "da6c3f1a-221e-59df-abdd-24aefa44fcba"
     },
@@ -385,22 +710,47 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        208,
-        1040
+        880,
+        1440
       ],
       "alwaysOutputData": true
     },
     {
       "parameters": {
-        "jsCode": "const rows = $input.all().map(i => i.json).filter(r => r.bookingRef);\nreturn [{ json: { bookings: rows } }];"
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "rows",
+        "options": {}
+      },
+      "id": "9b58d77a-951b-52e8-b79f-050c06758042",
+      "name": "AllBookings",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        1440
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a80aa56c-894d-5042-9bf3-49448072f2a8",
+              "name": "bookings",
+              "value": "={{ $json.rows.filter(r => r.bookingRef) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "53432292-067d-5468-89d3-c7b954a4f324",
       "name": "ShapeBookings",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
-        416,
-        1040
+        1296,
+        1440
       ]
     },
     {
@@ -416,8 +766,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        624,
-        1040
+        1504,
+        1440
       ]
     },
     {
@@ -432,8 +782,8 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        1088,
-        384
+        0,
+        1440
       ],
       "webhookId": "81039bc9-9ddb-5ac0-96f1-36d3ffeca5c0"
     },
@@ -572,8 +922,8 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        1296,
-        384
+        208,
+        1440
       ],
       "alwaysOutputData": true
     },
@@ -590,14 +940,14 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        1504,
-        384
+        416,
+        1440
       ]
     },
     {
       "parameters": {
-        "content": "## Dealers\n\nFixture dealers per market.",
-        "width": 656,
+        "content": "## Dealers\n\nRows from ar_mock_dealers, narrowed by market, dealerId and city (accent-insensitive).",
+        "width": 1072,
         "height": 336,
         "color": 7
       },
@@ -612,9 +962,9 @@
     },
     {
       "parameters": {
-        "content": "## Slots\n\nDeterministic from dealerId and date so tests repeat.",
-        "width": 656,
-        "height": 336,
+        "content": "## Slots\n\nDealer row from ar_mock_dealers; slots deterministic from dealerId and date so tests repeat (the one Code node kept in the mocks).",
+        "width": 864,
+        "height": 352,
         "color": 7
       },
       "id": "zone-02",
@@ -622,14 +972,14 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        608,
-        -128
+        -64,
+        256
       ]
     },
     {
       "parameters": {
-        "content": "## Book\n\nA slotId containing FULL answers 409. Bookings persist in ar_mock_bookings.",
-        "width": 1072,
+        "content": "## Book\n\nRequired fields, then the FULL probe (409), then a confirmation code hashed from the idempotency key. Bookings persist in ar_mock_bookings.",
+        "width": 1696,
         "height": 608,
         "color": 7
       },
@@ -639,14 +989,14 @@
       "typeVersion": 1,
       "position": [
         -64,
-        256
+        656
       ]
     },
     {
       "parameters": {
         "content": "## Cancel\n\nMarks the booking cancelled.",
         "width": 656,
-        "height": 608,
+        "height": 336,
         "color": 7
       },
       "id": "zone-04",
@@ -654,14 +1004,14 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        1024,
-        256
+        -64,
+        1312
       ]
     },
     {
       "parameters": {
         "content": "## Bookings by VIN\n\nLists bookings for reschedule and cancel flows.",
-        "width": 864,
+        "width": 1072,
         "height": 336,
         "color": 7
       },
@@ -670,13 +1020,13 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -64,
-        912
+        608,
+        1312
       ]
     },
     {
       "parameters": {
-        "content": "## Mock DealerBook\n\nFive endpoints under ar-mock/dealerbook/*. Slots are deterministic per dealer and date. A slotId containing FULL returns 409. Bookings persist in ar_mock_bookings.",
+        "content": "## Mock DealerBook\n\nFive endpoints under ar-mock/dealerbook/*. Dealers are rows in ar_mock_dealers (seeded by AR-90). Slots are deterministic per dealer and date. A slotId containing FULL returns 409. Bookings persist in ar_mock_bookings.",
         "width": 768,
         "height": 256,
         "color": 6
@@ -693,6 +1043,28 @@
   ],
   "connections": {
     "ReceiveDealers": {
+      "main": [
+        [
+          {
+            "node": "LoadDealers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LoadDealers": {
+      "main": [
+        [
+          {
+            "node": "AllDealers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AllDealers": {
       "main": [
         [
           {
@@ -718,6 +1090,17 @@
       "main": [
         [
           {
+            "node": "LoadDealer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LoadDealer": {
+      "main": [
+        [
+          {
             "node": "GenerateSlots",
             "type": "main",
             "index": 0
@@ -737,6 +1120,75 @@
       ]
     },
     "ReceiveBook": {
+      "main": [
+        [
+          {
+            "node": "BookInvalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BookInvalid": {
+      "main": [
+        [
+          {
+            "node": "ReplyInvalid",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SlotFull",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReplyInvalid": {
+      "main": [
+        [
+          {
+            "node": "IsConflict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SlotFull": {
+      "main": [
+        [
+          {
+            "node": "ReplyConflict",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HashKey",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReplyConflict": {
+      "main": [
+        [
+          {
+            "node": "IsConflict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HashKey": {
       "main": [
         [
           {
@@ -802,6 +1254,17 @@
       "main": [
         [
           {
+            "node": "AllBookings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AllBookings": {
+      "main": [
+        [
+          {
             "node": "ShapeBookings",
             "type": "main",
             "index": 0
@@ -847,7 +1310,7 @@
     "executionOrder": "v1"
   },
   "meta": {
-    "description": "Lab stand-in for DealerBook (dealers, slots, book, bookings by VIN, cancel). Deterministic synthetic data. Replace with the dealer booking API."
+    "description": "Lab stand-in for DealerBook (dealers, slots, book, bookings by VIN, cancel). Dealers in ar_mock_dealers, deterministic slots, bookings in ar_mock_bookings. Replace with the dealer booking API."
   },
   "tags": [
     "voice-booking",

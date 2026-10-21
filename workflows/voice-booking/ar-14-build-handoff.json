@@ -98,15 +98,227 @@
     },
     {
       "parameters": {
-        "jsCode": "// Builds the contact-center return context. Positional payload, version first, correlation ID never truncated.\nconst inp = $('ToolInput').first().json;\nconst s = $('LoadSession').first().json;\nconst m = $json;\nconst I = ({ BOOK: 'B', RESCHEDULE: 'R', CANCEL: 'C', OTHER: 'O', UNKNOWN: 'U' })[inp.intent] || 'U';\nconst RR = ({ CALLER_REQUEST: 'CR', SCENARIO_REQUIRES_AGENT: 'SA', NOT_UNDERSTOOD: 'NU', BACKEND_UNAVAILABLE: 'BU', IDENTIFICATION_FAILED: 'IF', NO_SLOT: 'NS', POLICY: 'PO', PLATFORM_ERROR: 'PE' })[inp.handoffReason] || 'PE';\nconst lang = s.language || m.defaultLanguage || 'en';\nconst base = ['1', s.correlationId || '', s.sessionId || '', I, RR, lang];\nconst withCase = s.caseId ? base.concat([s.caseId]) : base;\nconst MAX_ASCII = 128, MAX_HEX_BYTES = 64;\nconst truncated = [];\nlet ascii = withCase.join(';');\nif (ascii.length > MAX_ASCII) { ascii = base.join(';'); truncated.push('ascii:caseId'); }\nlet hexSrc = withCase.join(';');\nif (Buffer.byteLength(hexSrc, 'utf8') > MAX_HEX_BYTES) { hexSrc = base.join(';'); truncated.push('hex:caseId'); }\nif (Buffer.byteLength(hexSrc, 'utf8') > MAX_HEX_BYTES) truncated.push('hex:over_budget_correlationId_kept');\nconst hex = Buffer.from(hexSrc, 'utf8').toString('hex').toUpperCase();\nconst pd = '00';\nconst addr = String(m.returnNumber || 'sip:111102@cc.invalid').replace(/^sip:/, '');\nconst referTo = `<sip:${addr}?User-to-User=${hex}%3Bpd%3D${pd}%3Bencoding%3Dhex>`;\nconst referToAscii = `<sip:${addr}?User-to-User=${encodeURIComponent(ascii)}%3Bencoding%3Dascii>`;\nreturn [{ json: { ok: true, sessionId: s.sessionId, correlationId: s.correlationId, caseId: s.caseId || '', intent: inp.intent || 'UNKNOWN', handoffReason: inp.handoffReason || 'PLATFORM_ERROR', uuiPayload: hexSrc, uuiAscii: ascii, uuiHex: hex, pd, referTo, referToAscii, truncated, summary: String(inp.summary || '').slice(0, 500) } }];"
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PENDING"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "kind",
+              "condition": "eq",
+              "keyValue": "intent"
+            },
+            {
+              "keyName": "code",
+              "condition": "eq",
+              "keyValue": "={{ $('ToolInput').first().json.intent || 'UNKNOWN' }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
       },
-      "id": "ef63d2ef-0efd-5c70-b55e-b931a3d380f4",
-      "name": "BuildUui",
+      "id": "140136ca-8bbd-5488-9f99-38ab00c3845b",
+      "name": "LoadIntentCode",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        624,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PENDING"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "kind",
+              "condition": "eq",
+              "keyValue": "reason"
+            },
+            {
+              "keyName": "code",
+              "condition": "eq",
+              "keyValue": "={{ $('ToolInput').first().json.handoffReason || 'PLATFORM_ERROR' }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "id": "922d410a-522a-512d-9284-9b1afa28b634",
+      "name": "LoadReasonCode",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        832,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2be27810-a2c8-5bed-b905-a19b1b157649",
+              "name": "sessionId",
+              "value": "={{ $('LoadSession').first().json.sessionId }}",
+              "type": "string"
+            },
+            {
+              "id": "dee8a6e9-1db5-51a4-a3aa-0b906dde1914",
+              "name": "correlationId",
+              "value": "={{ $('LoadSession').first().json.correlationId || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "7a2d986f-d3f4-5216-b0cc-b7214d065298",
+              "name": "caseId",
+              "value": "={{ $('LoadSession').first().json.caseId || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "d30d7ba8-d749-5045-a50f-08c9d14fb0fb",
+              "name": "intent",
+              "value": "={{ $('ToolInput').first().json.intent || 'UNKNOWN' }}",
+              "type": "string"
+            },
+            {
+              "id": "1673b10c-1728-57b5-95fd-75001a3f521c",
+              "name": "handoffReason",
+              "value": "={{ $('ToolInput').first().json.handoffReason || 'PLATFORM_ERROR' }}",
+              "type": "string"
+            },
+            {
+              "id": "9069b911-6e6a-58fd-927b-5945475e8547",
+              "name": "summary",
+              "value": "={{ String($('ToolInput').first().json.summary || '').slice(0, 500) }}",
+              "type": "string"
+            },
+            {
+              "id": "d451cbf6-4ea6-500f-9d38-9b1fe44a7498",
+              "name": "returnNumber",
+              "value": "={{ $('LoadMarket').first().json.returnNumber || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "e8aca7dd-ef8f-50b7-9fb2-310cdbdaa5b5",
+              "name": "base",
+              "value": "={{ ['1', $('LoadSession').first().json.correlationId || '', $('LoadSession').first().json.sessionId || '', $('LoadIntentCode').first().json.short || 'U', $json.short || 'PE', $('LoadSession').first().json.language || $('LoadMarket').first().json.defaultLanguage || 'en'].join(';') }}",
+              "type": "string"
+            },
+            {
+              "id": "36c1be28-5f01-5f15-958c-2e04f7777f37",
+              "name": "payload",
+              "value": "={{ $('LoadSession').first().json.caseId ? ['1', $('LoadSession').first().json.correlationId || '', $('LoadSession').first().json.sessionId || '', $('LoadIntentCode').first().json.short || 'U', $json.short || 'PE', $('LoadSession').first().json.language || $('LoadMarket').first().json.defaultLanguage || 'en'].join(';') + ';' + $('LoadSession').first().json.caseId : ['1', $('LoadSession').first().json.correlationId || '', $('LoadSession').first().json.sessionId || '', $('LoadIntentCode').first().json.short || 'U', $json.short || 'PE', $('LoadSession').first().json.language || $('LoadMarket').first().json.defaultLanguage || 'en'].join(';') }}",
+              "type": "string"
+            },
+            {
+              "id": "2fa152f4-5402-52a0-9b11-64e3d9410c3f",
+              "name": "truncated",
+              "value": "={{ [] }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3c81cf94-2f7a-5505-9474-0e50d09b9681",
+      "name": "AssemblePayload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "830f6fab-4ec3-5f8a-a40a-fbf970fd46a7",
+              "leftValue": "={{ encodeURIComponent($json.payload).replace(/%[0-9A-F]{2}/g, 'x').length }}",
+              "rightValue": 64,
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4a5208b8-017b-503a-b38a-ef6b60fedcfa",
+      "name": "FitsBudget",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        208,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ee5b3bf9-2f36-50cf-bcec-f57951223c0c",
+              "name": "payload",
+              "value": "={{ $json.base }}",
+              "type": "string"
+            },
+            {
+              "id": "86b6d36d-ff70-544e-a236-9579a2a72115",
+              "name": "truncated",
+              "value": "={{ ['caseId'].concat(encodeURIComponent($json.base).replace(/%[0-9A-F]{2}/g, 'x').length > 64 ? ['over_budget_correlationId_kept'] : []) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "0ff04cbb-d5da-590f-af83-686bc0585b94",
+      "name": "DropCaseId",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Hex-encodes the return UUI and builds the SIP REFER targets. What goes in and what is dropped is decided upstream (AssemblePayload, FitsBudget).\nconst p = $json;\nconst hex = Buffer.from(p.payload, 'utf8').toString('hex').toUpperCase();\nconst addr = String(p.returnNumber || 'sip:111102@cc.invalid').replace(/^sip:/, '');\nreturn [{ json: { ok: true, sessionId: p.sessionId, correlationId: p.correlationId, caseId: p.caseId, intent: p.intent, handoffReason: p.handoffReason, uuiPayload: p.payload, uuiAscii: p.payload, uuiHex: hex, pd: '00',\n  referTo: `<sip:${addr}?User-to-User=${hex}%3Bpd%3D00%3Bencoding%3Dhex>`, referToAscii: `<sip:${addr}?User-to-User=${encodeURIComponent(p.payload)}%3Bencoding%3Dascii>`, truncated: p.truncated || [], summary: p.summary } }];"
+      },
+      "id": "1e4e1c38-5b9a-5414-943c-d2ed19b8d872",
+      "name": "EncodeUui",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        672,
-        0
+        416,
+        432
       ]
     },
     {
@@ -417,28 +629,30 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        880,
-        0
+        624,
+        432
       ],
       "alwaysOutputData": true
     },
     {
       "parameters": {
-        "jsCode": "return [{ json: $('BuildUui').first().json }];"
+        "mode": "raw",
+        "jsonOutput": "={{ $('EncodeUui').first().json }}",
+        "options": {}
       },
       "id": "a4472ec4-7309-598a-8760-d330d48b04af",
       "name": "ReturnHandoff",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
-        1088,
-        0
+        832,
+        432
       ]
     },
     {
       "parameters": {
-        "content": "## Context\n\nSession and market rows: the return number and the language come from the market.",
-        "width": 656,
+        "content": "## Context\n\nSession and market rows (return number, default language) and the short codes for the intent and the handoff reason from ar_codes.",
+        "width": 1072,
         "height": 352,
         "color": 5
       },
@@ -453,9 +667,9 @@
     },
     {
       "parameters": {
-        "content": "## Return UUI\n\nHex payload within 64 bytes, Refer-To string, stored on the session for the lookup endpoint.",
-        "width": 656,
-        "height": 352,
+        "content": "## Return UUI\n\nAssemblePayload builds version;correlationId;sessionId;intent;reason;language plus caseId. FitsBudget checks 64 bytes; DropCaseId removes the case id first and logs it. EncodeUui hex-encodes and builds the Refer-To, stored on the session for the lookup endpoint.",
+        "width": 1072,
+        "height": 656,
         "color": 3
       },
       "id": "zone-02",
@@ -463,13 +677,13 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        608,
-        -144
+        -64,
+        256
       ]
     },
     {
       "parameters": {
-        "content": "## AR-14 Build handoff\n\nThe one place that knows the contact-center UUI format. Hex budget 64 bytes, ASCII 128. The correlation ID is never truncated; the case ID is dropped first and logged.",
+        "content": "## AR-14 Build handoff\n\nThe one place that knows the contact-center UUI format. Short codes come from ar_codes. FitsBudget: 64 bytes hex-encoded; the case ID is dropped first and logged, the correlation ID is never truncated. EncodeUui only encodes.",
         "width": 768,
         "height": 256,
         "color": 6
@@ -511,14 +725,76 @@
       "main": [
         [
           {
-            "node": "BuildUui",
+            "node": "LoadIntentCode",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "BuildUui": {
+    "LoadIntentCode": {
+      "main": [
+        [
+          {
+            "node": "LoadReasonCode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LoadReasonCode": {
+      "main": [
+        [
+          {
+            "node": "AssemblePayload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AssemblePayload": {
+      "main": [
+        [
+          {
+            "node": "FitsBudget",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FitsBudget": {
+      "main": [
+        [
+          {
+            "node": "EncodeUui",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "DropCaseId",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DropCaseId": {
+      "main": [
+        [
+          {
+            "node": "EncodeUui",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EncodeUui": {
       "main": [
         [
           {

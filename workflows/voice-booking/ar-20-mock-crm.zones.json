@@ -3,11 +3,12 @@
   "zones": [
     {
       "title": "Mock CRM",
-      "body": "Four synthetic customers keyed by VIN. Lab only.",
+      "body": "Synthetic customers in ar_mock_customers, keyed by VIN. Lab only; the real build swaps the table read for one HTTP Request.",
       "color": 7,
       "nodes": [
         "ReceiveLookup",
-        "LookupFixture",
+        "LookupCustomer",
+        "ShapeFixture",
         "RespondCustomer"
       ]
     }
@@ -15,7 +16,7 @@
   "panels": [
     {
       "title": "Mock CRM / customer master",
-      "body": "Four synthetic customers keyed by VIN. Unknown VIN returns found:false with HTTP 200.",
+      "body": "Synthetic customers in the ar_mock_customers table (seeded by AR-90), keyed by VIN. Unknown VIN returns found:false with HTTP 200. Real build: one HTTP Request to the customer API in place of the table read.",
       "color": 6,
       "width": 624
     }

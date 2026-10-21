@@ -20,14 +20,95 @@
     },
     {
       "parameters": {
-        "jsCode": "// Mock of the case system API. Real build: the case system's REST with OAuth2 client credentials.\nconst b = $json.body || {};\nconst op = b.op || 'create';\nlet caseId = b.caseId || '';\nif (op === 'create' || !caseId) {\n  let h = 0; for (const ch of String(b.correlationId || Date.now())) h = (h * 33 + ch.charCodeAt(0)) >>> 0;\n  caseId = 'CS-' + (10000000 + (h % 90000000)).toString();\n}\nconst now = new Date().toISOString();\nreturn [{ json: { caseId, correlationId: b.correlationId || '', status: b.status || (op === 'create' ? 'In Progress' : 'Closed'),\n  subject: b.subject || 'Appointment booking via voice assistant', classification: b.classification || 'Appointment Booking',\n  solution: b.solution || '', delegatedReason: b.delegatedReason || '', openedAt: op === 'create' ? now : (b.openedAt || ''), lastUpdate: now, op } }];"
+        "action": "hash",
+        "type": "SHA256",
+        "value": "={{ String($json.body.correlationId || Date.now()) }}",
+        "dataPropertyName": "hash",
+        "encoding": "hex"
       },
-      "id": "24e951ba-9cf4-5f2b-9f44-278776034b05",
-      "name": "ComputeCase",
-      "type": "n8n-nodes-base.code",
+      "id": "c3d0fea8-75c7-5e07-9605-b6c6af9ecb03",
+      "name": "HashCorrelation",
+      "type": "n8n-nodes-base.crypto",
       "typeVersion": 2,
       "position": [
         208,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f70b0bdf-9356-5c31-9690-e0b2ee0169cb",
+              "name": "op",
+              "value": "={{ ($json.body.op || 'create') }}",
+              "type": "string"
+            },
+            {
+              "id": "8a73d98b-8d70-56b9-9209-4c6b772de302",
+              "name": "caseId",
+              "value": "={{ (($json.body.op || 'create') === 'create' || !$json.body.caseId) ? 'CS-' + (10000000 + (parseInt($json.hash.slice(0, 8), 16) % 90000000)) : $json.body.caseId }}",
+              "type": "string"
+            },
+            {
+              "id": "87d3d456-d536-5818-9c97-5aabba4b749a",
+              "name": "correlationId",
+              "value": "={{ $json.body.correlationId || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "1e201877-880c-51c0-8c49-e183a5c466e2",
+              "name": "status",
+              "value": "={{ $json.body.status || (($json.body.op || 'create') === 'create' ? 'In Progress' : 'Closed') }}",
+              "type": "string"
+            },
+            {
+              "id": "658ece15-dec5-5a4d-8d74-d30a8db0cba7",
+              "name": "subject",
+              "value": "={{ $json.body.subject || 'Appointment booking via voice assistant' }}",
+              "type": "string"
+            },
+            {
+              "id": "6531678e-a374-5bfd-9506-b8d8e1d6be31",
+              "name": "classification",
+              "value": "={{ $json.body.classification || 'Appointment Booking' }}",
+              "type": "string"
+            },
+            {
+              "id": "c11378f8-e7b4-59ee-a16d-dff6e9375406",
+              "name": "solution",
+              "value": "={{ $json.body.solution || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "daffa018-dbaf-5017-9075-e53db3d5815e",
+              "name": "delegatedReason",
+              "value": "={{ $json.body.delegatedReason || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "e41a2ffd-43ad-57cc-9f45-a0482c8c70e0",
+              "name": "openedAt",
+              "value": "={{ ($json.body.op || 'create') === 'create' ? $now.toUTC().toISO() : ($json.body.openedAt || '') }}",
+              "type": "string"
+            },
+            {
+              "id": "11024354-b292-56fd-a90a-544310f2ef23",
+              "name": "lastUpdate",
+              "value": "={{ $now.toUTC().toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "24e951ba-9cf4-5f2b-9f44-278776034b05",
+      "name": "ComputeCase",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
         0
       ]
     },
@@ -164,7 +245,7 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        416,
+        624,
         0
       ],
       "alwaysOutputData": true
@@ -182,14 +263,14 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        624,
+        832,
         0
       ]
     },
     {
       "parameters": {
-        "content": "## Mock case system\n\nCase numbers deterministic per correlationId; rows in ar_mock_cases.",
-        "width": 864,
+        "content": "## Mock case system\n\nCase number from a hash of the correlationId; rows in ar_mock_cases.",
+        "width": 1072,
         "height": 336,
         "color": 7
       },
@@ -204,7 +285,7 @@
     },
     {
       "parameters": {
-        "content": "## Mock case system\n\nOne endpoint, op in the body. Case numbers are deterministic from the correlation ID, so a re-created case is the same case.",
+        "content": "## Mock case system\n\nOne endpoint, op in the body. Case numbers are deterministic from the correlation ID (SHA-256), so a re-created case is the same case. Real build: the case system's REST with OAuth2 client credentials.",
         "width": 704,
         "height": 256,
         "color": 6
@@ -221,6 +302,17 @@
   ],
   "connections": {
     "ReceiveCaseOp": {
+      "main": [
+        [
+          {
+            "node": "HashCorrelation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HashCorrelation": {
       "main": [
         [
           {

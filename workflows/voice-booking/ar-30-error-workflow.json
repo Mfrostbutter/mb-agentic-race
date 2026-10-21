@@ -14,12 +14,88 @@
     },
     {
       "parameters": {
-        "jsCode": "const e = $json;\nconst msg = String((e.execution && e.execution.error && e.execution.error.message) || '').slice(0, 300);\nreturn [{ json: { at: new Date().toISOString(), correlationId: '', sessionId: '', caseId: '', workflow: (e.workflow && e.workflow.name) || '', event: 'error', state: '', tool: (e.execution && e.execution.lastNodeExecuted) || '', latencyMs: 0, outcome: 'failed', errorCode: 'workflow_error', detail: msg + ' execution=' + ((e.execution && e.execution.id) || '') } }];"
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1fde0851-8776-5eea-b728-b97ab1150eaa",
+              "name": "at",
+              "value": "={{ $now.toUTC().toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "36ed9954-7f48-5840-8035-cb3b33cef3b9",
+              "name": "correlationId",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "f05cbfd2-a4f4-5864-a10e-aedff12a47b9",
+              "name": "sessionId",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "923a37ee-16bd-5446-ad42-f9d0c71419d8",
+              "name": "caseId",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "cbe67d7b-42ca-5914-8a8c-ceb109715969",
+              "name": "workflow",
+              "value": "={{ ($json.workflow || {}).name || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "599c36c2-4af6-5b4b-8ec5-808377b697fd",
+              "name": "event",
+              "value": "error",
+              "type": "string"
+            },
+            {
+              "id": "9d366aa6-0ff5-50ec-828b-0a945d07f12c",
+              "name": "state",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "c8e496e5-099c-58e9-ae11-26732799ca2d",
+              "name": "tool",
+              "value": "={{ ($json.execution || {}).lastNodeExecuted || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "d4a0c7c2-a97f-5ef2-8db7-9754cbf25d9b",
+              "name": "latencyMs",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "179f26ac-afa6-54cb-8764-2bd5857ef058",
+              "name": "outcome",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "0313c6d6-f3fc-52f2-aa72-912752cadf80",
+              "name": "errorCode",
+              "value": "workflow_error",
+              "type": "string"
+            },
+            {
+              "id": "3803876f-3db0-5804-a86d-28bff3010dd7",
+              "name": "detail",
+              "value": "={{ String((($json.execution || {}).error || {}).message || '').slice(0, 300) + ' execution=' + (($json.execution || {}).id || '') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "5b2ac87c-cab7-56ea-8358-a2b11a7723fb",
       "name": "ShapeError",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
         208,
         0

@@ -3,12 +3,14 @@
   "zones": [
     {
       "title": "Mock comms",
-      "body": "Returns a message id, sends nothing.",
+      "body": "customerRef and text required; returns a message id, sends nothing.",
       "color": 7,
       "nodes": [
         "ReceiveSend",
-        "ComputeMessage",
-        "RespondSend"
+        "HasRequired",
+        "AcceptMessage",
+        "RespondSend",
+        "RejectMessage"
       ]
     }
   ],

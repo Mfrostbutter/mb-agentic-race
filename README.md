@@ -25,7 +25,7 @@ phone call -> contact center (SIP trunk, UUI) -> voice gateway (SIP, STT, TTS)
               v                v                    v                   v
         AR-10 identify   AR-11/12/13 dealers,   AR-15 case          AR-16 confirmation
         (CRM)            slots, booking         AR-14 handover payload (hex UUI for SIP REFER)
-        Data Tables: ar_sessions, ar_events, ar_markets, ar_codes   Postgres: ar_chat_memory (purged per call)
+        Data Tables: ar_sessions, ar_events, ar_markets, ar_codes, ar_prompts   Postgres: ar_chat_memory (purged per call)
 ```
 
 The gateway is thin: telephony and speech only. n8n is the brain. Every turn

@@ -92,12 +92,14 @@
     },
     {
       "parameters": {
-        "jsCode": "const s = $json;\nif (!s.sessionId) return [{ json: { found: false, statusCode: 404 } }];\nreturn [{ json: { found: true, statusCode: 200, correlationId: s.correlationId, sessionId: s.sessionId, caseId: s.caseId, state: s.state, intent: s.intent, handoffReason: s.handoffReason || null, handoffResult: s.handoffResult || null, summary: s.handoffSummary || '', dealer: s.dealerName || null, slotId: s.slotId || null, confirmationCode: s.confirmationCode || null, language: s.language, market: s.market, startedAt: s.startedAt, endedAt: s.endedAt || null } }];"
+        "mode": "raw",
+        "jsonOutput": "={{ $json.sessionId ? { found: true, statusCode: 200, correlationId: $json.correlationId, sessionId: $json.sessionId, caseId: $json.caseId, state: $json.state, intent: $json.intent, handoffReason: $json.handoffReason || null, handoffResult: $json.handoffResult || null, summary: $json.handoffSummary || '', dealer: $json.dealerName || null, slotId: $json.slotId || null, confirmationCode: $json.confirmationCode || null, language: $json.language, market: $json.market, startedAt: $json.startedAt, endedAt: $json.endedAt || null } : { found: false, statusCode: 404 } }}",
+        "options": {}
       },
       "id": "6b1a397e-1554-5c5e-a48c-162101f3511a",
       "name": "ShapeHandoffContext",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
         880,
         0

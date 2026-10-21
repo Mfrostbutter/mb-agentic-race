@@ -14,9 +14,11 @@
     },
     {
       "title": "Load state",
-      "body": "The session row and the market row are the only state the model sees.",
+      "body": "Prompts (goals, rules, spoken lines), the session row and the market row are the only state the model sees.",
       "color": 3,
       "nodes": [
+        "LoadPrompts",
+        "Prompts",
         "LoadSession",
         "SessionFound",
         "LoadMarket",
@@ -24,11 +26,27 @@
       ]
     },
     {
-      "title": "Reason",
-      "body": "PrepareTurn rebuilds the system prompt from facts and applies the yes/no gates. The agent has three tools, Postgres memory and a structured parser with auto-fix.",
+      "title": "Gates and prompt",
+      "body": "YesNoGate: a deterministic yes or no in IDENTIFY, CONSENT and DEALER moves the state before the model runs, so a small model cannot loop on a confirmed question. The system prompt is rebuilt every turn from ar_prompts and the facts.",
       "color": 5,
       "nodes": [
+        "TurnFacts",
+        "YesNoGate",
+        "AssembleFacts",
+        "ComposeFacts",
         "PrepareTurn",
+        "OnIdentityFailed",
+        "OnIdentityConfirmed",
+        "OnConsentDeclined",
+        "OnConsentGiven",
+        "OnDealerAgreed"
+      ]
+    },
+    {
+      "title": "Reason",
+      "body": "The agent has three tools, Postgres memory and a structured parser with auto-fix.",
+      "color": 5,
+      "nodes": [
         "DialogueAgent",
         "DialogueModel",
         "TurnMemory",

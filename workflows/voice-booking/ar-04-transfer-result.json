@@ -33,13 +33,47 @@
           "mode": "id",
           "value": "PENDING"
         },
+        "returnAll": true
+      },
+      "id": "2027249c-b030-5754-ba94-36d2be84a3cb",
+      "name": "LoadPrompts",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "prompts",
+        "options": {}
+      },
+      "id": "bb4cafb6-4342-5af2-9d9b-9f0f0f8f539d",
+      "name": "Prompts",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        416,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PENDING"
+        },
         "matchType": "allConditions",
         "filters": {
           "conditions": [
             {
               "keyName": "sessionId",
               "condition": "eq",
-              "keyValue": "={{ $json.body.sessionId }}"
+              "keyValue": "={{ $('ReceiveTransferResult').first().json.body.sessionId }}"
             }
           ]
         },
@@ -51,7 +85,7 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        208,
+        624,
         0
       ],
       "alwaysOutputData": true
@@ -86,7 +120,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        416,
+        832,
         0
       ]
     },
@@ -103,21 +137,260 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        416,
+        832,
         272
       ]
     },
     {
       "parameters": {
-        "jsCode": "// One retry, never a loop. contact-center requirement.\nconst b = $('ReceiveTransferResult').first().json.body || {};\nconst s = $json;\nconst ok = b.referAccepted !== false && /^2\\d\\d/.test(String(b.notifyStatus || ''));\nconst prior = String(s.handoffResult || '');\nconst lines = { pl: ['Chwileczkę, próbuję ponownie połączyć z konsultantem.', 'Nie udało mi się połączyć. Konsultant oddzwoni do Państwa. Do widzenia.'], es: ['Un momento, vuelvo a intentar pasarle con un agente.', 'No he podido transferirle. Un agente le devolverá la llamada. Adiós.'], de: ['Einen Moment, ich versuche die Weiterleitung noch einmal.', 'Die Weiterleitung ist fehlgeschlagen. Ein Mitarbeiter ruft Sie zurück. Auf Wiederhören.'], en: ['One moment, I am trying the transfer again.', 'I could not transfer you. A colleague will call you back. Goodbye.'] };\nconst L = lines[s.language] || lines.en;\nlet action, speak = '';\nif (ok) action = 'release';\nelse if (!prior.startsWith('failed')) { action = 'speak_and_retry_once'; speak = L[0]; }\nelse { action = 'speak_and_end'; speak = L[1]; }\nconst handoffResult = ok ? 'completed:' + (b.notifyStatus || '') : (prior.startsWith('failed') ? 'failed_final:' : 'failed:') + (b.notifyStatus || 'unknown');\nreturn [{ json: { sessionId: s.sessionId, correlationId: s.correlationId, caseId: s.caseId, action, speak, handoffResult, notifyStatus: String(b.notifyStatus || ''), state: s.state } }];"
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c6be3232-a380-5542-ad76-f4846d0f6103",
+                    "leftValue": "={{ $('ReceiveTransferResult').first().json.body.referAccepted !== false }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  },
+                  {
+                    "id": "96282186-2c56-5664-a4c6-378111da798c",
+                    "leftValue": "={{ String($('ReceiveTransferResult').first().json.body.notifyStatus || '') }}",
+                    "rightValue": "^2\\d\\d",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Released"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "a52e89d3-0f76-5334-ab94-73083e890c63",
+                    "leftValue": "={{ $json.handoffResult || '' }}",
+                    "rightValue": "failed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notStartsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "RetryOnce"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Final"
+        }
+      },
+      "id": "fe779091-93c2-5e9e-8b68-a063d9511118",
+      "name": "TransferOutcome",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "27fed5e5-a700-5615-b3b0-2aa95a1c3829",
+              "name": "action",
+              "value": "release",
+              "type": "string"
+            },
+            {
+              "id": "c99da0b6-a513-5f94-b165-01174222bdef",
+              "name": "speak",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "be8adcce-c754-5b35-90a6-6f6f0587de56",
+              "name": "handoffResult",
+              "value": "={{ 'completed:' + ($('ReceiveTransferResult').first().json.body.notifyStatus || '') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "05aab629-4c16-5d65-8973-18ce66a04b3f",
+      "name": "OnReleased",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        944
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bf0471c1-1cdf-5055-81ff-d926be284c39",
+              "name": "action",
+              "value": "speak_and_retry_once",
+              "type": "string"
+            },
+            {
+              "id": "3352f6b4-5260-5a17-a526-b3adb8dcd7a4",
+              "name": "speak",
+              "value": "={{ (($('Prompts').first().json.prompts.find(p => p.key === 'retryTransfer') || {})[$json.language] || ($('Prompts').first().json.prompts.find(p => p.key === 'retryTransfer') || {}).en || '') }}",
+              "type": "string"
+            },
+            {
+              "id": "cba43980-b657-55df-8263-d26393092dea",
+              "name": "handoffResult",
+              "value": "={{ 'failed:' + ($('ReceiveTransferResult').first().json.body.notifyStatus || 'unknown') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "7b39e116-2928-5aba-a57c-12808caf7d39",
+      "name": "OnRetryOnce",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        1216
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "53017e23-ce75-5e19-97c1-14ba74432af7",
+              "name": "action",
+              "value": "speak_and_end",
+              "type": "string"
+            },
+            {
+              "id": "059eee53-d243-5978-b7dd-744506a85b58",
+              "name": "speak",
+              "value": "={{ (($('Prompts').first().json.prompts.find(p => p.key === 'transferFailed') || {})[$json.language] || ($('Prompts').first().json.prompts.find(p => p.key === 'transferFailed') || {}).en || '') }}",
+              "type": "string"
+            },
+            {
+              "id": "cb2a5813-8d07-51c5-8e1f-fa5e51d45363",
+              "name": "handoffResult",
+              "value": "={{ 'failed_final:' + ($('ReceiveTransferResult').first().json.body.notifyStatus || 'unknown') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "0747b322-2e12-514b-86f1-7f0b50e50da6",
+      "name": "OnFinal",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        1488
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b7765661-32a8-53f5-9d66-0852244d8010",
+              "name": "sessionId",
+              "value": "={{ $json.sessionId }}",
+              "type": "string"
+            },
+            {
+              "id": "2938fa23-30df-5902-86db-8d7114db1e8e",
+              "name": "correlationId",
+              "value": "={{ $json.correlationId || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "7755d1a1-ef27-503e-a4b3-1adf33bf60e5",
+              "name": "caseId",
+              "value": "={{ $json.caseId || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "5cb5b824-4063-52ce-8aef-f93a00574d61",
+              "name": "action",
+              "value": "={{ $json.action }}",
+              "type": "string"
+            },
+            {
+              "id": "188cf901-da8d-540b-8df3-88f32894518b",
+              "name": "speak",
+              "value": "={{ $json.speak }}",
+              "type": "string"
+            },
+            {
+              "id": "f79c7612-3475-531f-b043-3038ba3cfcd6",
+              "name": "handoffResult",
+              "value": "={{ $json.handoffResult }}",
+              "type": "string"
+            },
+            {
+              "id": "6289080f-947a-5ef6-8a38-bc641bdc6987",
+              "name": "notifyStatus",
+              "value": "={{ String($('ReceiveTransferResult').first().json.body.notifyStatus || '') }}",
+              "type": "string"
+            },
+            {
+              "id": "5c42ca20-4ee1-5aa7-ac4d-41cc80dcec3d",
+              "name": "state",
+              "value": "={{ $json.state || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "a4790bb8-d640-538e-977f-d554d042401b",
       "name": "DecideTransferAction",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
-        672,
-        0
+        208,
+        672
       ]
     },
     {
@@ -425,8 +698,8 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        880,
-        0
+        416,
+        672
       ],
       "alwaysOutputData": true
     },
@@ -579,8 +852,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        1088,
-        0
+        624,
+        672
       ]
     },
     {
@@ -596,14 +869,14 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        1296,
-        0
+        832,
+        672
       ]
     },
     {
       "parameters": {
         "content": "## Receive\n\nNOTIFY result of the REFER, posted by the gateway.",
-        "width": 656,
+        "width": 1072,
         "height": 608,
         "color": 4
       },
@@ -618,9 +891,9 @@
     },
     {
       "parameters": {
-        "content": "## Decide\n\nFirst failure: speak and retry once. Second failure: speak and end. Success: release.",
-        "width": 864,
-        "height": 608,
+        "content": "## Decide\n\nTransferOutcome: NOTIFY 2xx releases; a first failure speaks and retries once; a second failure speaks and ends. One retry, never a loop.",
+        "width": 1072,
+        "height": 1168,
         "color": 5
       },
       "id": "zone-02",
@@ -628,13 +901,13 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        608,
-        -128
+        -64,
+        528
       ]
     },
     {
       "parameters": {
-        "content": "## AR-04 Transfer result\n\nREFER acceptance is not completion. The outcome is stored on the session and the retry policy is one attempt.",
+        "content": "## AR-04 Transfer result\n\nREFER acceptance is not completion. The outcome is stored on the session and the retry policy is one attempt: TransferOutcome routes to release, retry once, or end.",
         "width": 704,
         "height": 256,
         "color": 6
@@ -650,7 +923,87 @@
     }
   ],
   "connections": {
+    "LoadPrompts": {
+      "main": [
+        [
+          {
+            "node": "Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TransferOutcome": {
+      "main": [
+        [
+          {
+            "node": "OnReleased",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OnRetryOnce",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OnFinal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnReleased": {
+      "main": [
+        [
+          {
+            "node": "DecideTransferAction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnRetryOnce": {
+      "main": [
+        [
+          {
+            "node": "DecideTransferAction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnFinal": {
+      "main": [
+        [
+          {
+            "node": "DecideTransferAction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "ReceiveTransferResult": {
+      "main": [
+        [
+          {
+            "node": "LoadPrompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompts": {
       "main": [
         [
           {
@@ -676,7 +1029,7 @@
       "main": [
         [
           {
-            "node": "DecideTransferAction",
+            "node": "TransferOutcome",
             "type": "main",
             "index": 0
           }

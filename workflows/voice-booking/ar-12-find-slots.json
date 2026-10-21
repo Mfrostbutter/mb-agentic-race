@@ -67,11 +67,42 @@
     },
     {
       "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PENDING"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "market",
+              "condition": "eq",
+              "keyValue": "={{ $json.market }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "id": "33862960-60f3-5dbb-9778-b0f33749e223",
+      "name": "LoadMarket",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        416,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
         "method": "POST",
         "url": "http://localhost:5678/webhook/ar-mock/dealerbook/slots",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ dealerId: $('ToolInput').first().json.dealerId || $json.dealerId, fromDate: $('ToolInput').first().json.fromDate || '', serviceType: $('ToolInput').first().json.serviceType || '', market: $json.market }) }}",
+        "jsonBody": "={{ JSON.stringify({ dealerId: $('ToolInput').first().json.dealerId || $('LoadSession').first().json.dealerId, fromDate: $('ToolInput').first().json.fromDate || '', serviceType: $('ToolInput').first().json.serviceType || '', market: $('LoadSession').first().json.market }) }}",
         "options": {
           "timeout": 15000
         }
@@ -81,7 +112,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        416,
+        624,
         0
       ],
       "retryOnFail": true,
@@ -91,14 +122,78 @@
     },
     {
       "parameters": {
-        "jsCode": "// Keeps at most three slots, labels them for speech, and prepares the session update.\nconst r = $json;\nconst inp = $('ToolInput').first().json;\nconst s = $('LoadSession').first().json;\nconst max = 3;\nconst days = { pl: ['niedziela','poniedziałek','wtorek','środa','czwartek','piątek','sobota'], es: ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'], de: ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'], en: ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'] };\nconst dn = days[s.language] || days.en;\nconst slots = (r.slots || []).slice(0, max).map(o => { const d = new Date(o.startsAt + 'Z'); return { slotId: o.slotId, startsAt: o.startsAt, dealerId: o.dealerId, dealerName: r.dealerName, label: `${dn[d.getUTCDay()]} ${o.startsAt.slice(8,10)}.${o.startsAt.slice(5,7)}. ${o.startsAt.slice(11,16)}` }; });\nconst result = slots.length\n  ? { ok: true, dealerId: r.dealerId, dealerName: r.dealerName, slots: slots.map(o => ({ slotId: o.slotId, when: o.label })), note: 'Offer these by day and time, never by slotId. When the caller picks one, use its slotId in BookAppointment.' }\n  : { ok: true, dealerId: r.dealerId, dealerName: r.dealerName, slots: [], note: r.reason === 'dealer_not_dealerbook_enabled' ? 'This dealer cannot be booked online. Hand off with SCENARIO_REQUIRES_AGENT.' : 'No slots in this window. Try once more with a later fromDate, then hand off with NO_SLOT.' };\nreturn [{ json: { result, offeredSlots: JSON.stringify(slots), dealerId: r.dealerId || inp.dealerId || s.dealerId, dealerName: r.dealerName || s.dealerName, sessionId: s.sessionId } }];"
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c5fe0b30-1fb1-54b4-a926-f42c5a82350f",
+              "name": "slots",
+              "value": "={{ ($json.slots || []).slice(0, Number($('LoadMarket').first().json.maxSlotsOffered) || 3).map(o => ({ slotId: o.slotId, startsAt: o.startsAt, dealerId: o.dealerId, dealerName: $json.dealerName, label: DateTime.fromISO(o.startsAt, { zone: 'utc' }).setLocale($('LoadSession').first().json.language || 'en').toFormat('cccc dd.MM. HH:mm') })) }}",
+              "type": "array"
+            },
+            {
+              "id": "931f11e5-36b6-5fcf-9eea-9194b740484a",
+              "name": "dealerId",
+              "value": "={{ $json.dealerId || $('ToolInput').first().json.dealerId || $('LoadSession').first().json.dealerId || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "e85ca311-aec9-5e64-8c1a-77ff12a09d5d",
+              "name": "dealerName",
+              "value": "={{ $json.dealerName || $('LoadSession').first().json.dealerName || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "36254db5-52e9-59c1-9c41-2838f15b9aa0",
+              "name": "reason",
+              "value": "={{ $json.reason || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "f44f71f2-48fb-5f9a-8b8e-a8aea611d653",
+              "name": "sessionId",
+              "value": "={{ $('LoadSession').first().json.sessionId }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "eaabc68b-82d4-597a-a7cf-e4c899d9d4d9",
       "name": "ShapeSlots",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
-        624,
+        832,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "95734ff7-400b-5fb4-bc19-2cb33620b195",
+              "name": "offeredSlots",
+              "value": "={{ JSON.stringify($json.slots) }}",
+              "type": "string"
+            },
+            {
+              "id": "c6763236-b6f6-5473-8b74-5d435d105704",
+              "name": "result",
+              "value": "={{ $json.slots.length ? { ok: true, dealerId: $json.dealerId, dealerName: $json.dealerName, slots: $json.slots.map(o => ({ slotId: o.slotId, when: o.label })), note: 'Offer these by day and time, never by slotId. When the caller picks one, use its slotId in BookAppointment.' } : { ok: true, dealerId: $json.dealerId, dealerName: $json.dealerName, slots: [], note: $json.reason === 'dealer_not_dealerbook_enabled' ? 'This dealer cannot be booked online. Hand off with SCENARIO_REQUIRES_AGENT.' : 'No slots in this window. Try once more with a later fromDate, then hand off with NO_SLOT.' } }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "567f8232-c3f4-5f7a-ac5b-d480190aceb3",
+      "name": "OfferSlots",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1088,
         0
       ]
     },
@@ -409,21 +504,23 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        880,
+        1296,
         0
       ],
       "alwaysOutputData": true
     },
     {
       "parameters": {
-        "jsCode": "return [{ json: $('ShapeSlots').first().json.result }];"
+        "mode": "raw",
+        "jsonOutput": "={{ $('OfferSlots').first().json.result }}",
+        "options": {}
       },
       "id": "2bcd3be0-4394-51f7-aa74-a15fc3f90c4b",
       "name": "ReturnSlots",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
-        1088,
+        1504,
         0
       ]
     },
@@ -464,15 +561,15 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        624,
+        832,
         272
       ]
     },
     {
       "parameters": {
-        "content": "## Find slots\n\nDealerBook availability for the agreed dealer from the requested date.",
-        "width": 864,
-        "height": 624,
+        "content": "## Find slots\n\nDealerBook availability for the agreed dealer from the requested date; at most maxSlotsOffered (market row), labelled in the session language.",
+        "width": 1072,
+        "height": 656,
         "color": 5
       },
       "id": "zone-01",
@@ -481,14 +578,14 @@
       "typeVersion": 1,
       "position": [
         -64,
-        -144
+        -176
       ]
     },
     {
       "parameters": {
-        "content": "## Remember what was offered\n\nOffered slots are stored on the session so a booking can only name one of them.",
-        "width": 448,
-        "height": 624,
+        "content": "## Remember what was offered\n\nOffered slots are stored on the session so a booking can only name one of them; the tool returns them by day and time, never by slotId.",
+        "width": 656,
+        "height": 656,
         "color": 3
       },
       "id": "zone-02",
@@ -496,13 +593,13 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        816,
-        -144
+        1024,
+        -176
       ]
     },
     {
       "parameters": {
-        "content": "## AR-12 FindSlots\n\nThe offered slots are written to the session row. BookAppointment refuses any slotId that was not offered in this call: slots are facts, not model output.",
+        "content": "## AR-12 FindSlots\n\nThe offered slots are written to the session row. BookAppointment refuses any slotId that was not offered in this call: slots are facts, not model output. Labels are spoken-form weekday, date and time in the session language.",
         "width": 768,
         "height": 256,
         "color": 6
@@ -513,7 +610,7 @@
       "typeVersion": 1,
       "position": [
         -64,
-        -416
+        -448
       ]
     }
   ],
@@ -530,6 +627,17 @@
       ]
     },
     "LoadSession": {
+      "main": [
+        [
+          {
+            "node": "LoadMarket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LoadMarket": {
       "main": [
         [
           {
@@ -562,6 +670,17 @@
       "main": [
         [
           {
+            "node": "OfferSlots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OfferSlots": {
+      "main": [
+        [
+          {
             "node": "StoreOffered",
             "type": "main",
             "index": 0
@@ -585,7 +704,7 @@
     "executionOrder": "v1"
   },
   "meta": {
-    "description": "Agent tool. Returns up to three bookable DealerBook slots for a dealer from a date. Inputs: sessionId (plumbed), dealerId, fromDate (YYYY-MM-DD), serviceType. Side effect: stores the offered slots on the session so BookAppointment can validate the choice."
+    "description": "Agent tool. Returns up to maxSlotsOffered (market row, default three) bookable DealerBook slots for a dealer from a date. Inputs: sessionId (plumbed), dealerId, fromDate (YYYY-MM-DD), serviceType. Side effect: stores the offered slots on the session so BookAppointment can validate the choice."
   },
   "tags": [
     "voice-booking",

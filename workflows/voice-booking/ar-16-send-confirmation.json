@@ -64,12 +64,34 @@
     },
     {
       "parameters": {
-        "jsCode": "const r = $json; return [{ json: { ok: !!r.accepted, messageId: r.messageId || '', channel: r.channel || '' } }];"
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4fc5b850-2dab-5811-88a4-b18af594a336",
+              "name": "ok",
+              "value": "={{ !!$json.accepted }}",
+              "type": "boolean"
+            },
+            {
+              "id": "58dffebb-c8e7-5af1-9a2e-95031f2a12e1",
+              "name": "messageId",
+              "value": "={{ $json.messageId || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "558665d4-f7d2-5fc0-bdb9-e20789c67d79",
+              "name": "channel",
+              "value": "={{ $json.channel || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "304cedc7-0b04-5252-8621-438c25b72dd5",
       "name": "ShapeComms",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
         416,
         0

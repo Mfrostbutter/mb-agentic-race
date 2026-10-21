@@ -98,8 +98,9 @@ person follows up.
 | `ar_events` (Data Table, append only) | One row per step: correlation id, session, case, workflow, event, state, tool, latency, outcome, error code, detail | Structured fields only |
 | `ar_markets` (Data Table, config) | Per market: languages, bookable flag, disclosure texts per language, handover and closing lines, confirmation channels, return address, slot window | Seeded by AR-90 |
 | `ar_codes` (Data Table, config) | Intent and handoff reason codes with their short form, contact-center value and description | Seeded by AR-90 |
+| `ar_prompts` (Data Table, config) | Everything the assistant says or is told: persona, rules, the goal per state, greeting, apology and confirmation lines, transfer lines; one row per key, a column per language, English fallback | Seeded by AR-90; a wording change is one cell |
 | `ar_chat_memory` (Postgres) | The agent's conversation memory, keyed by session | Deleted at session end |
-| `ar_mock_bookings`, `ar_mock_cases` (Data Tables) | State for the mocks | Lab only |
+| `ar_mock_bookings`, `ar_mock_cases`, `ar_mock_customers`, `ar_mock_dealers` (Data Tables) | State for the mocks | Lab only |
 
 ## 6. Security and privacy
 

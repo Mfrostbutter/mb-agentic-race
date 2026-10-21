@@ -20,15 +20,122 @@
     },
     {
       "parameters": {
-        "jsCode": "const b = $json.body || {};\nif (!b.customerRef || !b.text) return [{ json: { accepted: false, error: 'customerRef and text are required' } }];\nreturn [{ json: { accepted: true, messageId: 'msg-' + Date.now().toString(36), channel: b.channel || 'sms', customerRef: b.customerRef, length: String(b.text).length } }];"
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "29d65cc6-abd8-53cf-84e3-c3042021c8b2",
+              "leftValue": "={{ String($json.body.customerRef || '') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "fd1bf733-3529-57f1-b3c9-4de5c7adbacf",
+              "leftValue": "={{ String($json.body.text || '') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       },
-      "id": "eb304d55-fd78-508e-a3cb-2fd11aed35e6",
-      "name": "ComputeMessage",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "id": "0d366042-c1eb-53f9-a1ed-09daf335aa3b",
+      "name": "HasRequired",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
       "position": [
         208,
         0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7cbbc2ff-82aa-56f7-bb33-544b6ef59f18",
+              "name": "accepted",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "6ce23fc6-f83f-538c-b40d-59e6b5d3825c",
+              "name": "messageId",
+              "value": "={{ 'msg-' + Date.now().toString(36) }}",
+              "type": "string"
+            },
+            {
+              "id": "ad99cf41-107f-56d2-89ea-c1bad59a09d5",
+              "name": "channel",
+              "value": "={{ $json.body.channel || 'sms' }}",
+              "type": "string"
+            },
+            {
+              "id": "5d0f6fb2-6086-58af-b60f-0b7c00a812ab",
+              "name": "customerRef",
+              "value": "={{ $json.body.customerRef }}",
+              "type": "string"
+            },
+            {
+              "id": "c5cd3942-a645-5b86-b5ff-a1a49444e790",
+              "name": "length",
+              "value": "={{ String($json.body.text).length }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7f7af117-126d-5d5e-a2b6-f1c4d3d63117",
+      "name": "AcceptMessage",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "10d6580f-a079-5fd0-943d-2822406ad106",
+              "name": "accepted",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "d0e254e7-345f-52d1-a098-d445c5210ab1",
+              "name": "error",
+              "value": "customerRef and text are required",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "591b0633-c4a5-599a-99c0-4e15becd4668",
+      "name": "RejectMessage",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        272
       ]
     },
     {
@@ -44,15 +151,15 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        416,
+        624,
         0
       ]
     },
     {
       "parameters": {
-        "content": "## Mock comms\n\nReturns a message id, sends nothing.",
-        "width": 656,
-        "height": 336,
+        "content": "## Mock comms\n\ncustomerRef and text required; returns a message id, sends nothing.",
+        "width": 864,
+        "height": 608,
         "color": 7
       },
       "id": "zone-01",
@@ -86,14 +193,43 @@
       "main": [
         [
           {
-            "node": "ComputeMessage",
+            "node": "HasRequired",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "ComputeMessage": {
+    "HasRequired": {
+      "main": [
+        [
+          {
+            "node": "AcceptMessage",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RejectMessage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AcceptMessage": {
+      "main": [
+        [
+          {
+            "node": "RespondSend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RejectMessage": {
       "main": [
         [
           {

@@ -14,9 +14,11 @@
     },
     {
       "title": "Load state",
-      "body": "The session row decides the outcome.",
+      "body": "The confirmation text comes from ar_prompts; the session row decides the outcome.",
       "color": 3,
       "nodes": [
+        "LoadPrompts",
+        "Prompts",
         "LoadSession",
         "SessionFound",
         "RespondNotFound"
@@ -24,13 +26,17 @@
     },
     {
       "title": "Outcome",
-      "body": "Resolved, Delegated or Closed on the case; a confirmation goes out when a booking exists.",
+      "body": "CaseOutcome in order: a booking exists (Resolved); ended in HANDOFF or a handoff end reason (Delegated); otherwise Closed. A confirmation goes out when a booking exists.",
       "color": 3,
       "nodes": [
+        "CaseOutcome",
         "DecideOutcome",
         "CloseCase",
         "NeedsConfirmation",
-        "SendConfirmation"
+        "OnBooked",
+        "SendConfirmation",
+        "OnHandedOff",
+        "OnClosed"
       ]
     },
     {

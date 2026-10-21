@@ -56,12 +56,76 @@
     },
     {
       "parameters": {
-        "jsCode": "const r = $json;\nreturn [{ json: { ok: true, known: !!r.found, customerRef: r.customerRef || '', vehicleRef: r.vin || '', greetingName: r.greetingName || '', vehicleLabel: r.vehicleLabel || '', preferredDealerId: r.preferredDealerId || '', preferredDealerName: r.preferredDealerName || '', market: r.market || '', language: r.language || '' } }];"
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ca1145ad-b6d7-5bb4-8a84-5d7610593508",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "5ba1f884-3617-5c9e-acfd-6412eea5b552",
+              "name": "known",
+              "value": "={{ !!$json.found }}",
+              "type": "boolean"
+            },
+            {
+              "id": "26951ea4-b2db-5c15-9916-f90dd56a3868",
+              "name": "customerRef",
+              "value": "={{ $json.customerRef || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "42e01b15-da34-52cc-a5ae-2591167cdb61",
+              "name": "vehicleRef",
+              "value": "={{ $json.vin || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "d3e6647f-f9e2-5afc-826c-9ff75722587c",
+              "name": "greetingName",
+              "value": "={{ $json.greetingName || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "242f81d9-8842-5b4d-9c58-f0ad8877cfac",
+              "name": "vehicleLabel",
+              "value": "={{ $json.vehicleLabel || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "c4e19414-2354-5cc7-a6d4-452b1f6c2809",
+              "name": "preferredDealerId",
+              "value": "={{ $json.preferredDealerId || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "4a1a9171-28dd-5b8a-9a8c-266a7d8f90b5",
+              "name": "preferredDealerName",
+              "value": "={{ $json.preferredDealerName || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "17c09cb6-0f7b-5f12-b5d7-a840f4fb752b",
+              "name": "market",
+              "value": "={{ $json.market || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "98769343-f0eb-5c96-a0bd-10f1d44596c9",
+              "name": "language",
+              "value": "={{ $json.language || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "573141af-0b20-53e6-a40a-996d6603352e",
       "name": "ShapeCustomer",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
         416,
         0

@@ -27,12 +27,64 @@
     },
     {
       "parameters": {
-        "jsCode": "const b = $json.body || {};\nconst ok = !!b.sessionId;\nreturn [{ json: { valid: ok, statusCode: ok ? 200 : 400, error: ok ? null : 'validation_error', message: ok ? null : 'sessionId missing', sessionId: String(b.sessionId || ''), endReason: String(b.endReason || 'completed'), durationMs: Number(b.durationMs) || 0, startedAt: Date.now() } }];"
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f4417cef-66bd-5a64-a704-f63c9a158bf3",
+              "name": "valid",
+              "value": "={{ !!($json.body || {}).sessionId }}",
+              "type": "boolean"
+            },
+            {
+              "id": "97603a45-d918-5238-9b3f-163b590a76c7",
+              "name": "statusCode",
+              "value": "={{ ($json.body || {}).sessionId ? 200 : 400 }}",
+              "type": "number"
+            },
+            {
+              "id": "ae675f36-bec5-5e1c-b00b-9eb2a855cc32",
+              "name": "error",
+              "value": "={{ ($json.body || {}).sessionId ? '' : 'validation_error' }}",
+              "type": "string"
+            },
+            {
+              "id": "355f6360-e60a-5b55-864e-d54eae642223",
+              "name": "message",
+              "value": "={{ ($json.body || {}).sessionId ? '' : 'sessionId missing' }}",
+              "type": "string"
+            },
+            {
+              "id": "93ba6025-a238-5bcc-ba6a-3dfd9914cc81",
+              "name": "sessionId",
+              "value": "={{ String(($json.body || {}).sessionId || '') }}",
+              "type": "string"
+            },
+            {
+              "id": "ba309dce-650a-52eb-924e-a257850161b9",
+              "name": "endReason",
+              "value": "={{ String(($json.body || {}).endReason || 'completed') }}",
+              "type": "string"
+            },
+            {
+              "id": "041904ef-a707-5a16-a31c-591a7f6f6f53",
+              "name": "durationMs",
+              "value": "={{ Number(($json.body || {}).durationMs) || 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "0651e584-a049-5e1a-88d1-1a4b60dd7542",
+              "name": "startedAt",
+              "value": "={{ Date.now() }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "04b0045f-6761-563e-8522-a6edbd4d9b79",
       "name": "ValidateEnd",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
         208,
         0
@@ -97,13 +149,47 @@
           "mode": "id",
           "value": "PENDING"
         },
+        "returnAll": true
+      },
+      "id": "dc715148-8433-5daa-8732-e3a770938729",
+      "name": "LoadPrompts",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "prompts",
+        "options": {}
+      },
+      "id": "768c7248-d006-53af-a260-b1899397245b",
+      "name": "Prompts",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PENDING"
+        },
         "matchType": "allConditions",
         "filters": {
           "conditions": [
             {
               "keyName": "sessionId",
               "condition": "eq",
-              "keyValue": "={{ $json.sessionId }}"
+              "keyValue": "={{ $('ValidateEnd').first().json.sessionId }}"
             }
           ]
         },
@@ -115,7 +201,7 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        672,
+        1088,
         0
       ],
       "alwaysOutputData": true
@@ -150,7 +236,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        880,
+        1296,
         0
       ]
     },
@@ -167,21 +253,317 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        880,
+        1296,
         272
       ]
     },
     {
       "parameters": {
-        "jsCode": "// Decides the case outcome and whether a confirmation is still owed.\nconst req = $('ValidateEnd').first().json;\nconst s = $json;\nconst booked = !!s.bookingRef;\nlet caseStatus, solution = '', delegatedReason = '';\nif (booked) { caseStatus = 'Resolved'; solution = `Appointment booked via voice assistant. Confirmation code ${s.confirmationCode}. Dealer ${s.dealerName || s.dealerId}. Slot ${s.slotId}.`; }\nelse if (s.state === 'HANDOFF' || String(req.endReason).startsWith('handoff')) { caseStatus = 'Delegated'; delegatedReason = `Handed to agent: ${s.handoffReason || 'unknown'}. ${s.handoffSummary || ''}`.trim(); }\nelse { caseStatus = 'Closed'; solution = `Call ended without booking (${req.endReason}) in state ${s.state}.`; }\nconst needsConfirmation = booked && String(s.confirmationSent) !== 'true';\nconst texts = { pl: `Serwis: wizyta serwisowa potwierdzona. Kod ${s.confirmationCode}, ${s.dealerName}, termin ${s.slotId}.`, es: `Taller: cita de taller confirmada. Código ${s.confirmationCode}, ${s.dealerName}, cita ${s.slotId}.`, de: `Werkstatt: Werkstatttermin bestätigt. Code ${s.confirmationCode}, ${s.dealerName}, Termin ${s.slotId}.`, en: `Workshop: service appointment confirmed. Code ${s.confirmationCode}, ${s.dealerName}, slot ${s.slotId}.` };\nreturn [{ json: { sessionId: s.sessionId, correlationId: s.correlationId, caseId: s.caseId, caseStatus, solution, delegatedReason, needsConfirmation, booked, language: s.language, customerRef: s.customerRef, confirmationChannel: s.confirmationChannel || 'sms', confirmationText: texts[s.language] || texts.en, endReason: req.endReason, state: s.state, durationMs: req.durationMs } }];"
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "d7cf1779-761f-5bff-adc7-2d3e22deee2e",
+                    "leftValue": "={{ $json.bookingRef || '' }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEmpty",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Booked"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "92be74f4-68b0-56b9-b1f6-98842676f203",
+                    "leftValue": "={{ $json.state || '' }}",
+                    "rightValue": "HANDOFF",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "HandedOff"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "62c1ea03-8a1a-552d-aa9f-1ed1c5e7eca8",
+                    "leftValue": "={{ String($('ValidateEnd').first().json.endReason || '') }}",
+                    "rightValue": "handoff",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "HandoffEnd"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Closed"
+        }
+      },
+      "id": "3d4768f1-fc05-5527-9daa-30616437eda6",
+      "name": "CaseOutcome",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e698c350-926f-5745-a0c4-dfc5c25a5f86",
+              "name": "caseStatus",
+              "value": "Resolved",
+              "type": "string"
+            },
+            {
+              "id": "83b8fb8a-5a3a-51de-b149-91ccab649d49",
+              "name": "solution",
+              "value": "={{ 'Appointment booked via voice assistant. Confirmation code ' + $json.confirmationCode + '. Dealer ' + ($json.dealerName || $json.dealerId) + '. Slot ' + $json.slotId + '.' }}",
+              "type": "string"
+            },
+            {
+              "id": "44a5d14c-d5d6-5560-9445-9f85cbb447ec",
+              "name": "delegatedReason",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "32f57b9a-3335-527f-bb5d-2c4515107606",
+      "name": "OnBooked",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        944
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6fd6c23c-8477-56b8-80b8-f2829a839729",
+              "name": "caseStatus",
+              "value": "Delegated",
+              "type": "string"
+            },
+            {
+              "id": "7c601f0a-a891-56ec-9563-424239c318a3",
+              "name": "solution",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "85edbcb6-ccf1-51a2-836a-a4a574371aaa",
+              "name": "delegatedReason",
+              "value": "={{ ('Handed to agent: ' + ($json.handoffReason || 'unknown') + '. ' + ($json.handoffSummary || '')).trim() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "ca4c37e2-1548-5c75-a8bf-c51b4026dbb9",
+      "name": "OnHandedOff",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        1216
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "34c5dee1-6ce7-55ec-81f4-9aee7bc79af9",
+              "name": "caseStatus",
+              "value": "Closed",
+              "type": "string"
+            },
+            {
+              "id": "97ca025f-33e7-5b2c-ae81-d15b4b3b8e60",
+              "name": "solution",
+              "value": "={{ 'Call ended without booking (' + $('ValidateEnd').first().json.endReason + ') in state ' + ($json.state || '') + '.' }}",
+              "type": "string"
+            },
+            {
+              "id": "71fae690-4bd8-560f-91d4-fbce8edf1d0b",
+              "name": "delegatedReason",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "bab6d726-a93b-58ad-ad30-ca7192015549",
+      "name": "OnClosed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        1488
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f275e477-6d67-502f-8720-224666e09c15",
+              "name": "sessionId",
+              "value": "={{ $json.sessionId }}",
+              "type": "string"
+            },
+            {
+              "id": "c01b7c4e-12f9-5b9b-b748-58214702ab8a",
+              "name": "correlationId",
+              "value": "={{ $json.correlationId || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "b47ed8e8-4397-5798-8120-7ec1c2e76f1a",
+              "name": "caseId",
+              "value": "={{ $json.caseId || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "2db2a767-10c6-5d61-a395-c01109eea8b8",
+              "name": "caseStatus",
+              "value": "={{ $json.caseStatus }}",
+              "type": "string"
+            },
+            {
+              "id": "5dbc22d6-4e4e-5278-b51b-b429c2cabde8",
+              "name": "solution",
+              "value": "={{ $json.solution }}",
+              "type": "string"
+            },
+            {
+              "id": "a98586f3-ffd8-519d-87e4-ae3cef68ec35",
+              "name": "delegatedReason",
+              "value": "={{ $json.delegatedReason }}",
+              "type": "string"
+            },
+            {
+              "id": "93b0ee7f-f410-56c4-8921-a6ecc3bdc409",
+              "name": "booked",
+              "value": "={{ !!$json.bookingRef }}",
+              "type": "boolean"
+            },
+            {
+              "id": "498f15f0-f244-5701-9f94-3a4d8d87dd19",
+              "name": "needsConfirmation",
+              "value": "={{ !!$json.bookingRef && String($json.confirmationSent) !== 'true' }}",
+              "type": "boolean"
+            },
+            {
+              "id": "4f2bb508-ffab-524a-8bae-fda792d229fd",
+              "name": "language",
+              "value": "={{ $json.language || 'en' }}",
+              "type": "string"
+            },
+            {
+              "id": "63bdfce3-3141-5cc1-81ac-128449043f37",
+              "name": "customerRef",
+              "value": "={{ $json.customerRef || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "742e1cb3-5299-5aba-8512-8f98ea3cd2cb",
+              "name": "confirmationChannel",
+              "value": "={{ $json.confirmationChannel || 'sms' }}",
+              "type": "string"
+            },
+            {
+              "id": "3cc59765-bc46-5792-9b55-58ad1dd12a07",
+              "name": "confirmationText",
+              "value": "={{ (($('Prompts').first().json.prompts.find(p => p.key === 'confirmation') || {})[$json.language] || ($('Prompts').first().json.prompts.find(p => p.key === 'confirmation') || {}).en || '').replace('{code}', $json.confirmationCode || '').replace('{dealer}', $json.dealerName || '').replace('{slot}', $json.slotId || '') }}",
+              "type": "string"
+            },
+            {
+              "id": "7325b675-f620-517c-841f-5d510b7aca49",
+              "name": "endReason",
+              "value": "={{ $('ValidateEnd').first().json.endReason }}",
+              "type": "string"
+            },
+            {
+              "id": "46081dfd-6c63-58b8-9937-43ca06ffde04",
+              "name": "state",
+              "value": "={{ $json.state || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "4d6f405d-950d-53cb-84d7-ee6bc47851f9",
+              "name": "durationMs",
+              "value": "={{ $('ValidateEnd').first().json.durationMs }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "0142b3de-f320-5ec5-9e4b-8b669f9aaf30",
       "name": "DecideOutcome",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
-        1136,
-        0
+        208,
+        672
       ]
     },
     {
@@ -300,8 +682,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        1344,
-        0
+        416,
+        672
       ]
     },
     {
@@ -334,8 +716,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1552,
-        0
+        624,
+        672
       ]
     },
     {
@@ -421,8 +803,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        1552,
-        272
+        624,
+        944
       ]
     },
     {
@@ -438,7 +820,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        0,
+        880,
         672
       ],
       "credentials": {
@@ -759,7 +1141,7 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        208,
+        1088,
         672
       ],
       "alwaysOutputData": true
@@ -913,7 +1295,7 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        416,
+        1296,
         672
       ]
     },
@@ -930,7 +1312,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        624,
+        1504,
         672
       ]
     },
@@ -952,8 +1334,8 @@
     },
     {
       "parameters": {
-        "content": "## Load state\n\nThe session row decides the outcome.",
-        "width": 448,
+        "content": "## Load state\n\nThe confirmation text comes from ar_prompts; the session row decides the outcome.",
+        "width": 864,
         "height": 624,
         "color": 3
       },
@@ -968,9 +1350,9 @@
     },
     {
       "parameters": {
-        "content": "## Outcome\n\nResolved, Delegated or Closed on the case; a confirmation goes out when a booking exists.",
-        "width": 656,
-        "height": 624,
+        "content": "## Outcome\n\nCaseOutcome in order: a booking exists (Resolved); ended in HANDOFF or a handoff end reason (Delegated); otherwise Closed. A confirmation goes out when a booking exists.",
+        "width": 864,
+        "height": 1168,
         "color": 3
       },
       "id": "zone-03",
@@ -978,15 +1360,15 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        1072,
-        -144
+        -64,
+        528
       ]
     },
     {
       "parameters": {
         "content": "## Close\n\nChat memory purged, session finalised, end logged. Nothing of the call is retained beyond ar_events.",
         "width": 864,
-        "height": 352,
+        "height": 1168,
         "color": 4
       },
       "id": "zone-04",
@@ -994,7 +1376,7 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -64,
+        816,
         528
       ]
     },
@@ -1016,6 +1398,82 @@
     }
   ],
   "connections": {
+    "LoadPrompts": {
+      "main": [
+        [
+          {
+            "node": "Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CaseOutcome": {
+      "main": [
+        [
+          {
+            "node": "OnBooked",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OnHandedOff",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OnHandedOff",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OnClosed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnBooked": {
+      "main": [
+        [
+          {
+            "node": "DecideOutcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnHandedOff": {
+      "main": [
+        [
+          {
+            "node": "DecideOutcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnClosed": {
+      "main": [
+        [
+          {
+            "node": "DecideOutcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "ReceiveEnd": {
       "main": [
         [
@@ -1042,7 +1500,7 @@
       "main": [
         [
           {
-            "node": "LoadSession",
+            "node": "LoadPrompts",
             "type": "main",
             "index": 0
           }
@@ -1050,6 +1508,17 @@
         [
           {
             "node": "RespondInvalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompts": {
+      "main": [
+        [
+          {
+            "node": "LoadSession",
             "type": "main",
             "index": 0
           }
@@ -1071,7 +1540,7 @@
       "main": [
         [
           {
-            "node": "DecideOutcome",
+            "node": "CaseOutcome",
             "type": "main",
             "index": 0
           }
