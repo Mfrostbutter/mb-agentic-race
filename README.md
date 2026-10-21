@@ -59,6 +59,9 @@ with inputs, outputs and guards: [docs/workflow-catalogue.md](docs/workflow-cata
 | `scripts/ar-golden-run.py` | Five scripted calls through the API; writes a scored report per run |
 | `scripts/organize_workflows.py`, `scripts/secrets_env.py` | Library the deploy script uses to place every workflow in its project and folder and to stop when the project cannot reach a credential or Data Table |
 | `scripts/canvas/` | Canvas layout scripts the generator runs: zone stickies and the layout check |
+| `scripts/node-policy.sh` | Node policy check over the workflow set: `RESULT: ok` or the findings |
+| `.agents/skills/n8n-native-nodes-first/` | The native-nodes-first rule the set is built under, with the checker; Claude Code reads it through a link |
+| `AGENTS.md` | Instructions for a coding agent working in this repository |
 
 ## Workflows
 
@@ -97,6 +100,26 @@ reason, transfer retries, false-confirmation hits, handoff context and
 memory purge. Reports land in `data/voice-booking/runs/` (gitignored). Pass
 bar before any promotion: 5/5 twice in a row.
 
+## Node policy
+
+Every workflow is built from the nodes n8n ships (`n8n-nodes-base.*`,
+`@n8n/n8n-nodes-langchain.*`): the dedicated node first, then HTTP Request
+on a credential, then a native transform (If, Switch, Edit Fields, Merge),
+then a Code node. The set has two Code nodes (`GenerateSlots`, a mock, and
+`EncodeUui`, six lines) and no community node, so a security review covers
+n8n itself and nothing else. The rule and its ladder are in
+`.agents/skills/n8n-native-nodes-first/SKILL.md`; the check runs offline:
+
+```bash
+scripts/node-policy.sh                       # the whole set
+scripts/node-policy.sh workflows/voice-booking/ar-02-dialogue-turn.json
+```
+
+A change that adds a community node, an HTTP call to a service a native
+node covers, or an HTTP call from a Code node fails the check unless the
+workflow JSON carries a `nodePolicy.exceptions` record naming the node, a
+reason and an approver. The skill shows the record.
+
 ## Security and privacy
 
 No secrets in workflows; values come through the n8n credential system.
@@ -125,5 +148,6 @@ The dialogue, guards, handover payload and tests do not change.
 
 This repository is generated from a private engagement repository by
 `scripts/sync-from-engagement.sh`, which rewrites customer-specific terms,
-regenerates the JSON and refuses to finish if any such term remains. Run
+regenerates the JSON, copies the node policy skill from the FDE harness and
+refuses to finish if any such term remains. Run
 reports, filled `.env` files and the ids file never enter this repository.

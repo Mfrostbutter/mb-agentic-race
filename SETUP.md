@@ -54,8 +54,12 @@ manager and export them for the session only.
 ## 3. Deploy
 
 ```bash
+scripts/node-policy.sh      # from the repository root; must print RESULT: ok
 python3 build/deploy.py
 ```
+
+The first line is the node policy check (README, "Node policy"). It passes
+on the shipped set; run it again after any change to `build/gen.py`.
 
 Two passes: the first creates the nineteen workflows by name and learns their
 ids, the second rewrites every sub-workflow reference and publishes. Callers

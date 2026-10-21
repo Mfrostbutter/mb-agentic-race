@@ -12,8 +12,10 @@
 # Usage: scripts/sync-from-engagement.sh [path-to-engagement-repo]
 set -euo pipefail
 SRC="${1:-$HOME/Developer/engagements/mercedes-benz}"
+HARNESS="${HARNESS:-$HOME/Developer/n8n-fde-harness}"
 DST="$(cd "$(dirname "$0")/.." && pwd)"
 [ -d "$SRC/workflows/agentic-race" ] || { echo "no agentic-race workflows under $SRC" >&2; exit 1; }
+[ -f "$HARNESS/skills/n8n-native-nodes-first/SKILL.md" ] || { echo "no n8n-native-nodes-first skill under $HARNESS" >&2; exit 1; }
 
 WF="$DST/workflows/voice-booking"
 rm -rf "$DST/workflows" "$DST/docs/agentic-race"
@@ -22,6 +24,25 @@ cp "$SRC/workflows/agentic-race/build/gen.py" "$SRC/workflows/agentic-race/build
 cp "$SRC/scripts/ar-golden-run.py" "$SRC/scripts/ar-seed.py" "$SRC/scripts/organize_workflows.py" "$SRC/scripts/secrets_env.py" "$DST/scripts/"
 cp "$SRC/scripts/canvas/zone_layout.py" "$SRC/scripts/canvas/layout_check.py" "$DST/scripts/canvas/"
 cp "$SRC/docs/agentic-race/04-workflow-catalogue.md" "$DST/docs/workflow-catalogue.md"
+
+# The node policy skill and its checker, vendored from the harness so the
+# rule the workflows were built under travels with them. .agents/skills is
+# the portable location (Codex, Cursor, Copilot); Claude Code reads the link.
+SKILL="$DST/.agents/skills/n8n-native-nodes-first"
+rm -rf "$DST/.agents/skills"
+mkdir -p "$SKILL/scripts" "$DST/.claude/skills"
+cp "$HARNESS/skills/n8n-native-nodes-first/SKILL.md" "$SKILL/"
+cp "$HARNESS/skills/n8n-native-nodes-first/scripts/node_policy_check.py" "$SKILL/scripts/"
+ln -sfn ../../.agents/skills/n8n-native-nodes-first "$DST/.claude/skills/n8n-native-nodes-first"
+cat > "$DST/scripts/node-policy.sh" <<'EOS'
+#!/usr/bin/env bash
+# Node policy check: native nodes first. RESULT: ok or the findings, exit 1 on an error.
+# Usage: scripts/node-policy.sh [workflow.json | directory] [--policy deploy/node-policy.json] [--json]
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+exec python3 "$HERE/.agents/skills/n8n-native-nodes-first/scripts/node_policy_check.py" "${@:-$HERE/workflows/voice-booking}"
+EOS
+chmod +x "$DST/scripts/node-policy.sh"
 
 python3 - "$DST" <<'EOF'
 import os, re, sys
@@ -111,6 +132,7 @@ TERMS = [
     ("byoc.euw2.genesys.example", "cc.example"),
     ("Genesys", "contact center"),
     # brand and customer
+    ("The Mercedes voice-booking conversion on 2026-10-21", "The conversion of this repository's workflow set on 2026-10-21"),
     ("the MB instance", "the production instance"),
     ("the MB systems", "the real systems"),
     ("MB customer API", "customer API"),
@@ -139,6 +161,9 @@ TERMS = [
     (",\n             os.path.expanduser(\"~/Developer/n8n-fde-harness/skills/n8n-canvas-docs/scripts\"),\n             os.path.expanduser(\"~/.claude/skills/n8n-canvas-docs/scripts\")", ""),
 ]
 SKIP = {"sync-from-engagement.sh"}
+# In the vendored skill, Salesforce is an n8n node name, not a customer term.
+SKILL_DIR = os.path.join(dst, ".agents")
+GENERIC = {"Standard Salesforce REST", "Salesforce REST", "Salesforce"}
 changed = {}
 for d, _, fs in os.walk(dst):
     if "/.git" in d:
@@ -152,7 +177,8 @@ for d, _, fs in os.walk(dst):
         except (UnicodeDecodeError, OSError):
             continue
         n = t
-        for old, new in TERMS:
+        terms = [x for x in TERMS if x[0] not in GENERIC] if p.startswith(SKILL_DIR) else TERMS
+        for old, new in terms:
             n = n.replace(old, new)
         if n != t:
             open(p, "w", encoding="utf-8").write(n); changed[os.path.relpath(p, dst)] = True
@@ -228,8 +254,11 @@ EOF
 
 # Nothing customer-specific, personal or lab-bound may remain.
 PATTERN='[Mm]ercedes|MERCEDES|Benz|BENZ|\bMB\b|[Ss]irius|SIRIUS|[Dd]sd|DSD|[Gg]enesys|GENESYS|Nexus|Model Garden|Salesforce|\bGIS\b|Daimler|Agentic Race|agentic-race|\bRace\b|jury|Jury|criteri|W1K|WDD|W1N|WDB|Frosty|frosty|Marta|Vivek|Dawid|Biniam|Eitler|Malaika|Daniele|Rajeshwari|Preeth|Zacharias|MASSP4AI|infisical|Infisical|podman|pg-lab|netbird|ag-ingest|10\.10\.|n8n-fde-harness|\.claude'
-if grep -rnE "$PATTERN" "$DST" --exclude-dir=.git --exclude=sync-from-engagement.sh --exclude=secrets_env.py; then
+if grep -rnE "$PATTERN" "$DST" --exclude-dir=.git --exclude-dir=.agents --exclude=sync-from-engagement.sh --exclude=secrets_env.py; then
   echo "sync refused: customer or private terms above" >&2; exit 1
+fi
+if grep -rnE "${PATTERN/|Salesforce/}" "$DST/.agents"; then
+  echo "sync refused: customer or private terms in the vendored skill" >&2; exit 1
 fi
 command -v gitleaks >/dev/null && gitleaks detect --source "$DST" --no-git --no-banner --redact
 cd "$DST" && git status --short | head -40
