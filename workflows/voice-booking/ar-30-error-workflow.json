@@ -1,0 +1,257 @@
+{
+  "name": "AR-30 Error workflow",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "6c1d02e7-967e-5410-934b-68a72b46f518",
+      "name": "OnWorkflowError",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const e = $json;\nconst msg = String((e.execution && e.execution.error && e.execution.error.message) || '').slice(0, 300);\nreturn [{ json: { at: new Date().toISOString(), correlationId: '', sessionId: '', caseId: '', workflow: (e.workflow && e.workflow.name) || '', event: 'error', state: '', tool: (e.execution && e.execution.lastNodeExecuted) || '', latencyMs: 0, outcome: 'failed', errorCode: 'workflow_error', detail: msg + ' execution=' + ((e.execution && e.execution.id) || '') } }];"
+      },
+      "id": "5b2ac87c-cab7-56ea-8358-a2b11a7723fb",
+      "name": "ShapeError",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PENDING"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "at": "={{ $json.at }}",
+            "correlationId": "={{ $json.correlationId }}",
+            "sessionId": "={{ $json.sessionId }}",
+            "caseId": "={{ $json.caseId }}",
+            "workflow": "={{ $json.workflow }}",
+            "event": "={{ $json.event }}",
+            "state": "={{ $json.state }}",
+            "tool": "={{ $json.tool }}",
+            "latencyMs": "={{ $json.latencyMs }}",
+            "outcome": "={{ $json.outcome }}",
+            "errorCode": "={{ $json.errorCode }}",
+            "detail": "={{ $json.detail }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "at",
+              "displayName": "at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "correlationId",
+              "displayName": "correlationId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "caseId",
+              "displayName": "caseId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "event",
+              "displayName": "event",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "tool",
+              "displayName": "tool",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "latencyMs",
+              "displayName": "latencyMs",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "outcome",
+              "displayName": "outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "errorCode",
+              "displayName": "errorCode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "detail",
+              "displayName": "detail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "a97eaa36-84e2-5f49-a8a1-2a3bcfd74d4d",
+      "name": "InsertErrorEvent",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        416,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Error trigger\n\nEvery AR-* failure lands in ar_events with workflow, node and message. Assign in Workflow Settings.",
+        "width": 656,
+        "height": 352,
+        "color": 3
+      },
+      "id": "zone-01",
+      "name": "zone-01",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## AR-30 Error workflow\n\nAssign in Workflow Settings > Error Workflow on every AR-* workflow. Writes to ar_events; wire a Teams or e-mail notification here on the production instance (different channel from the monitored one).",
+        "width": 768,
+        "height": 256,
+        "color": 6
+      },
+      "id": "zone-panel-1",
+      "name": "zone-panel-1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -416
+      ]
+    }
+  ],
+  "connections": {
+    "OnWorkflowError": {
+      "main": [
+        [
+          {
+            "node": "ShapeError",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ShapeError": {
+      "main": [
+        [
+          {
+            "node": "InsertErrorEvent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "Catch-all for any AR-* workflow failure that escapes per-node handling. Writes an error event with workflow, node and message. Assign it as the Error Workflow in each AR-* workflow's settings (UI)."
+  },
+  "tags": [
+    "voice-booking",
+    "ops"
+  ],
+  "project": "Voice Booking",
+  "folder": "Voice Booking Agent"
+}

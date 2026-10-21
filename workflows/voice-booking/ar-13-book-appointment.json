@@ -1,0 +1,640 @@
+{
+  "name": "AR-13 Tool: Book appointment",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "sessionId",
+              "type": "string"
+            },
+            {
+              "name": "slotId",
+              "type": "string"
+            },
+            {
+              "name": "serviceType",
+              "type": "string"
+            },
+            {
+              "name": "mobility",
+              "type": "string"
+            },
+            {
+              "name": "notes",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "2ec05973-b602-50a0-a423-cc84ed464800",
+      "name": "ToolInput",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PENDING"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sessionId",
+              "condition": "eq",
+              "keyValue": "={{ $json.sessionId }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "id": "53cfc87b-6f91-5ee9-bbb8-0a0a65dfb511",
+      "name": "LoadSession",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// The only place a booking can start. slotId must be one the session offered in this call.\nconst inp = $('ToolInput').first().json;\nconst s = $json;\nlet offered = []; try { offered = JSON.parse(s.offeredSlots || '[]'); } catch (e) { offered = []; }\nconst wanted = String(inp.slotId || '').trim();\nconst slot = offered.find(o => o.slotId === wanted);\nif (s.bookingRef) return [{ json: { proceed: false, ok: true, already: true, confirmationCode: s.confirmationCode, bookingRef: s.bookingRef, message: 'An appointment is already booked in this call. Read the existing confirmation code back; do not book again.' } }];\nif (!slot) return [{ json: { proceed: false, ok: false, error: 'slot_not_offered', message: 'slotId is not one of the slots offered in this call. Call FindSlots and use one of its slotIds.', offeredSlotIds: offered.map(o => o.slotId) } }];\nif (s.state !== 'CONFIRM' || s.slotId !== wanted) return [{ json: { proceed: false, ok: false, error: 'not_confirmed', message: 'The caller has not confirmed this slot yet. Read back dealer, day and time with this slotId in the slotId field (state CONFIRM), and call BookAppointment only in the next turn after the caller says yes.', pendingSlotId: s.slotId || null } }];\nreturn [{ json: { proceed: true, slot, sessionId: s.sessionId, correlationId: s.correlationId, vehicleRef: s.vehicleRef, serviceType: inp.serviceType || '', mobility: inp.mobility || '', notes: String(inp.notes || '').slice(0, 200), idempotencyKey: s.sessionId + ':' + slot.slotId } }];"
+      },
+      "id": "95a4dc62-963e-565b-8ebf-66532d5bb412",
+      "name": "ValidateSlot",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ad1b5922-e1e5-5363-bf8f-a0c155a097fa",
+              "leftValue": "={{ $json.proceed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "466e9230-9c2f-510e-99d0-52f70ac074a8",
+      "name": "CanProceed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        624,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/ar-mock/dealerbook/book",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ slotId: $json.slot.slotId, dealerId: $json.slot.dealerId, vin: $json.vehicleRef, serviceType: $json.serviceType, mobility: $json.mobility, notes: $json.notes, idempotencyKey: $json.idempotencyKey, correlationId: $json.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "2381711c-4c98-5630-8054-740d02b1b40c",
+      "name": "CallDealerBookBook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PENDING"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sessionId",
+              "condition": "eq",
+              "keyValue": "={{ $('ValidateSlot').first().json.sessionId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingRef": "={{ $json.bookingRef }}",
+            "confirmationCode": "={{ $json.confirmationCode }}",
+            "slotId": "={{ $json.slotId }}",
+            "state": "BOOKED",
+            "intent": "BOOK",
+            "confirmationChannel": "sms"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "correlationId",
+              "displayName": "correlationId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "caseId",
+              "displayName": "caseId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "market",
+              "displayName": "market",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "language",
+              "displayName": "language",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "intent",
+              "displayName": "intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "customerRef",
+              "displayName": "customerRef",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "vehicleRef",
+              "displayName": "vehicleRef",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "greetingName",
+              "displayName": "greetingName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "vehicleLabel",
+              "displayName": "vehicleLabel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "dealerId",
+              "displayName": "dealerId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "dealerName",
+              "displayName": "dealerName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "offeredSlots",
+              "displayName": "offeredSlots",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "slotId",
+              "displayName": "slotId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "bookingRef",
+              "displayName": "bookingRef",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confirmationCode",
+              "displayName": "confirmationCode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confirmationChannel",
+              "displayName": "confirmationChannel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confirmationSent",
+              "displayName": "confirmationSent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "handoffReason",
+              "displayName": "handoffReason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "handoffResult",
+              "displayName": "handoffResult",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "handoffSummary",
+              "displayName": "handoffSummary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "turns",
+              "displayName": "turns",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "startedAt",
+              "displayName": "startedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "endedAt",
+              "displayName": "endedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "endReason",
+              "displayName": "endReason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "lastLatencyMs",
+              "displayName": "lastLatencyMs",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "5d6ceaaf-b411-5437-beeb-450cb50b45ed",
+      "name": "StoreBooking",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1088,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $('CallDealerBookBook').first().json; const v = $('ValidateSlot').first().json;\nreturn [{ json: { ok: true, confirmationCode: b.confirmationCode, bookingRef: b.bookingRef, when: v.slot.label, dealerName: v.slot.dealerName, serviceType: v.serviceType, mobility: v.mobility, note: 'Booked. Read the confirmation code back to the caller slowly and tell them a confirmation message will follow.' } }];"
+      },
+      "id": "30d9feb9-aae8-58ce-9d66-2bd4f31f2fa9",
+      "name": "ReturnBooking",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1296,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Shapes a failed HTTP call into the sub-workflow's error contract. No throw: the caller branches on ok.\nconst e = $json.error || {};\nconst text = JSON.stringify(e);\nconst conflict = /409/.test(text);\nreturn [{ json: { ok: false, error: conflict ? 'slot_taken' : 'backend_unavailable',\n  message: conflict ? 'That slot was taken in the meantime. Call FindSlots again and offer new options.' : 'The backend system is unavailable. Apologise once and hand the caller to an agent (BACKEND_UNAVAILABLE).',\n  detail: String(e.message || '').slice(0, 200) } }];"
+      },
+      "id": "8eeff2be-ae15-5648-84ab-18644b2c7935",
+      "name": "ReturnBookError",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = { ...$json }; delete j.proceed; return [{ json: j }];"
+      },
+      "id": "50c58155-5927-5d09-9346-fc54dbfecb4f",
+      "name": "ReturnValidation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Validate\n\nThe slot must be one offered in this call, read back in CONFIRM, and confirmed in a later turn.",
+        "width": 864,
+        "height": 624,
+        "color": 5
+      },
+      "id": "zone-01",
+      "name": "zone-01",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Book\n\nIdempotency key session:slot. The confirmation code comes from DealerBook, never from the model.",
+        "width": 656,
+        "height": 624,
+        "color": 3
+      },
+      "id": "zone-02",
+      "name": "zone-02",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        816,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## AR-13 BookAppointment\n\nValidates the slotId against the session, books with an idempotency key, writes bookingRef and confirmationCode to the session, sets state BOOKED. The spoken confirmation is built from this result, never from the model.",
+        "width": 816,
+        "height": 256,
+        "color": 6
+      },
+      "id": "zone-panel-1",
+      "name": "zone-panel-1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -416
+      ]
+    }
+  ],
+  "connections": {
+    "ToolInput": {
+      "main": [
+        [
+          {
+            "node": "LoadSession",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LoadSession": {
+      "main": [
+        [
+          {
+            "node": "ValidateSlot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ValidateSlot": {
+      "main": [
+        [
+          {
+            "node": "CanProceed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CanProceed": {
+      "main": [
+        [
+          {
+            "node": "CallDealerBookBook",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ReturnValidation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CallDealerBookBook": {
+      "main": [
+        [
+          {
+            "node": "StoreBooking",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ReturnBookError",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "StoreBooking": {
+      "main": [
+        [
+          {
+            "node": "ReturnBooking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "Agent tool. Books one of the slots offered in this call in DealerBook and stores the confirmation on the session. Inputs: sessionId (plumbed), slotId, serviceType, mobility, notes. Returns {ok, confirmationCode, bookingRef, when, dealerName} or {ok:false, error}. Idempotent per session and slot."
+  },
+  "tags": [
+    "voice-booking",
+    "sub-workflow"
+  ],
+  "project": "Voice Booking",
+  "folder": "Voice Booking Agent"
+}

@@ -1,0 +1,120 @@
+{
+  "name": "AR-MOCK-CRM customer master",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ar-mock/crm/customer-lookup",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "bf2f6ac8-c2da-5cdd-9a31-beb989da5303",
+      "name": "ReceiveLookup",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "78136690-0d92-5a8b-9834-e9b742c022d2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mock of CRM / customer master. Real build: HTTP Request to the customer API with a technical-user credential.\nconst b = $json.body || {};\nconst vin = String(b.vin || '').toUpperCase().trim();\nconst customers = {\n  'TST2970461A123456': { customerRef: 'C-PL-004711', greetingName: 'Pani Kowalska', vehicleLabel: 'GLC 300 4MATIC', preferredDealerId: 'PL-WAW-01', preferredDealerName: 'Dealer Warszawa Okęcie', market: 'PL', language: 'pl' },\n  'TST2130421A654321': { customerRef: 'C-ES-002310', greetingName: 'Señor García', vehicleLabel: 'Clase E 220 d', preferredDealerId: 'ES-MAD-02', preferredDealerName: 'Dealer Madrid Castellana', market: 'ES', language: 'es' },\n  'TST1770871N998877': { customerRef: 'C-DE-009902', greetingName: 'Herr Weber', vehicleLabel: 'A 200', preferredDealerId: 'DE-STR-01', preferredDealerName: 'Dealer Stuttgart Mitte', market: 'DE', language: 'de' },\n  'TST2476011J112233': { customerRef: 'C-GB-001177', greetingName: 'Ms Patel', vehicleLabel: 'EQB 300', preferredDealerId: 'GB-LON-01', preferredDealerName: 'Dealer London West', market: 'GB', language: 'en' }\n};\nconst c = customers[vin];\nreturn [{ json: c ? { found: true, vin, ...c } : { found: false, vin } }];"
+      },
+      "id": "a1e2cd91-78c4-5eaa-aac2-5029b52953f1",
+      "name": "LookupFixture",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "ffb1dfd6-713e-5cae-806e-86aaaf21d1cd",
+      "name": "RespondCustomer",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        416,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Mock CRM\n\nFour synthetic customers keyed by VIN. Lab only.",
+        "width": 656,
+        "height": 336,
+        "color": 7
+      },
+      "id": "zone-01",
+      "name": "zone-01",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Mock CRM / customer master\n\nFour synthetic customers keyed by VIN. Unknown VIN returns found:false with HTTP 200.",
+        "width": 624,
+        "height": 256,
+        "color": 6
+      },
+      "id": "zone-panel-1",
+      "name": "zone-panel-1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -400
+      ]
+    }
+  ],
+  "connections": {
+    "ReceiveLookup": {
+      "main": [
+        [
+          {
+            "node": "LookupFixture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LookupFixture": {
+      "main": [
+        [
+          {
+            "node": "RespondCustomer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "Lab stand-in for CRM / customer master. POST ar-mock/crm/customer-lookup {vin, msisdn} -> {found, customerRef, greetingName, vehicleLabel, preferredDealerId, ...}. Synthetic data only."
+  },
+  "tags": [
+    "voice-booking",
+    "lab-stand-in"
+  ],
+  "project": "Voice Booking",
+  "folder": "Voice Booking Agent"
+}

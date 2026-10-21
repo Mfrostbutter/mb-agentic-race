@@ -1,0 +1,23 @@
+{
+  "gutter": 16,
+  "zones": [
+    {
+      "title": "Log event",
+      "body": "One structured row per step in ar_events. No audio, no transcript.",
+      "color": 5,
+      "nodes": [
+        "ToolInput",
+        "InsertEvent",
+        "ReturnOk"
+      ]
+    }
+  ],
+  "panels": [
+    {
+      "title": "AR-17 Log event",
+      "body": "One append per event. Columns carry ids, states and codes only, never caller text.",
+      "color": 6,
+      "width": 624
+    }
+  ]
+}

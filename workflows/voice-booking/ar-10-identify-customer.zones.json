@@ -1,0 +1,24 @@
+{
+  "gutter": 16,
+  "zones": [
+    {
+      "title": "Identify",
+      "body": "CRM lookup by VIN and number. Returns the greeting name and the vehicle label, never the identifiers.",
+      "color": 3,
+      "nodes": [
+        "ToolInput",
+        "CallCrm",
+        "ShapeCustomer",
+        "ReturnCrmError"
+      ]
+    }
+  ],
+  "panels": [
+    {
+      "title": "AR-10 Identify customer",
+      "body": "Identity is plumbed from the UUI, never from speech. The model never sees the VIN or the phone number.",
+      "color": 6,
+      "width": 704
+    }
+  ]
+}

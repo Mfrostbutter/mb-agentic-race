@@ -1,0 +1,24 @@
+{
+  "gutter": 16,
+  "zones": [
+    {
+      "title": "Send confirmation",
+      "body": "SMS or e-mail through the communication service; the destination is resolved from the CRM reference.",
+      "color": 4,
+      "nodes": [
+        "ToolInput",
+        "CallComms",
+        "ShapeComms",
+        "ReturnCommsError"
+      ]
+    }
+  ],
+  "panels": [
+    {
+      "title": "AR-16 Send confirmation",
+      "body": "The service resolves the destination from the CRM reference. n8n holds no phone number or e-mail address.",
+      "color": 6,
+      "width": 704
+    }
+  ]
+}

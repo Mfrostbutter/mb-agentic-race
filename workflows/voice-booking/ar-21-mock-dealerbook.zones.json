@@ -1,0 +1,67 @@
+{
+  "gutter": 16,
+  "zones": [
+    {
+      "title": "Dealers",
+      "body": "Fixture dealers per market.",
+      "color": 7,
+      "nodes": [
+        "ReceiveDealers",
+        "FilterDealers",
+        "RespondDealers"
+      ]
+    },
+    {
+      "title": "Slots",
+      "body": "Deterministic from dealerId and date so tests repeat.",
+      "color": 7,
+      "nodes": [
+        "ReceiveSlots",
+        "GenerateSlots",
+        "RespondSlots"
+      ]
+    },
+    {
+      "title": "Book",
+      "body": "A slotId containing FULL answers 409. Bookings persist in ar_mock_bookings.",
+      "color": 7,
+      "nodes": [
+        "ReceiveBook",
+        "ComputeBooking",
+        "IsConflict",
+        "UpsertBooking",
+        "RespondBooked",
+        "RespondConflict"
+      ]
+    },
+    {
+      "title": "Cancel",
+      "body": "Marks the booking cancelled.",
+      "color": 7,
+      "nodes": [
+        "ReceiveCancel",
+        "CancelBooking",
+        "RespondCancelled"
+      ]
+    },
+    {
+      "title": "Bookings by VIN",
+      "body": "Lists bookings for reschedule and cancel flows.",
+      "color": 7,
+      "nodes": [
+        "ReceiveBookings",
+        "FindBookingsByVin",
+        "ShapeBookings",
+        "RespondBookings"
+      ]
+    }
+  ],
+  "panels": [
+    {
+      "title": "Mock DealerBook",
+      "body": "Five endpoints under ar-mock/dealerbook/*. Slots are deterministic per dealer and date. A slotId containing FULL returns 409. Bookings persist in ar_mock_bookings.",
+      "color": 6,
+      "width": 768
+    }
+  ]
+}

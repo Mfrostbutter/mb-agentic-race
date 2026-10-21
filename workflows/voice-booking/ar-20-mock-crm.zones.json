@@ -1,0 +1,23 @@
+{
+  "gutter": 16,
+  "zones": [
+    {
+      "title": "Mock CRM",
+      "body": "Four synthetic customers keyed by VIN. Lab only.",
+      "color": 7,
+      "nodes": [
+        "ReceiveLookup",
+        "LookupFixture",
+        "RespondCustomer"
+      ]
+    }
+  ],
+  "panels": [
+    {
+      "title": "Mock CRM / customer master",
+      "body": "Four synthetic customers keyed by VIN. Unknown VIN returns found:false with HTTP 200.",
+      "color": 6,
+      "width": 624
+    }
+  ]
+}

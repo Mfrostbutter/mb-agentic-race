@@ -1,0 +1,24 @@
+{
+  "gutter": 16,
+  "zones": [
+    {
+      "title": "Mock case system",
+      "body": "Case numbers deterministic per correlationId; rows in ar_mock_cases.",
+      "color": 7,
+      "nodes": [
+        "ReceiveCaseOp",
+        "ComputeCase",
+        "UpsertCase",
+        "RespondCase"
+      ]
+    }
+  ],
+  "panels": [
+    {
+      "title": "Mock case system",
+      "body": "One endpoint, op in the body. Case numbers are deterministic from the correlation ID, so a re-created case is the same case.",
+      "color": 6,
+      "width": 704
+    }
+  ]
+}

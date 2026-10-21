@@ -1,0 +1,25 @@
+{
+  "gutter": 16,
+  "zones": [
+    {
+      "title": "Find dealers",
+      "body": "DealerBook dealer search by city; bookable tells the agent whether the dealer can be booked here.",
+      "color": 5,
+      "nodes": [
+        "ToolInput",
+        "LoadSession",
+        "CallDealerBookDealers",
+        "ShapeDealers",
+        "ReturnDealersError"
+      ]
+    }
+  ],
+  "panels": [
+    {
+      "title": "AR-11 FindDealers",
+      "body": "Market comes from the session row, city from the model. Non-bookable dealers are returned flagged so the agent routes them to a handoff.",
+      "color": 6,
+      "width": 704
+    }
+  ]
+}

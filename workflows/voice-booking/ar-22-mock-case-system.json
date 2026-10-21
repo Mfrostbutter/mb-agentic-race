@@ -1,0 +1,269 @@
+{
+  "name": "AR-MOCK-CASE Case system",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ar-mock/casesys/case",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "4abe96f5-b46a-5f75-8c23-90e7a8e14827",
+      "name": "ReceiveCaseOp",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "d6245114-68aa-5c33-8f0a-7c4725d5e2ac"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mock of the case system API. Real build: the case system's REST with OAuth2 client credentials.\nconst b = $json.body || {};\nconst op = b.op || 'create';\nlet caseId = b.caseId || '';\nif (op === 'create' || !caseId) {\n  let h = 0; for (const ch of String(b.correlationId || Date.now())) h = (h * 33 + ch.charCodeAt(0)) >>> 0;\n  caseId = 'CS-' + (10000000 + (h % 90000000)).toString();\n}\nconst now = new Date().toISOString();\nreturn [{ json: { caseId, correlationId: b.correlationId || '', status: b.status || (op === 'create' ? 'In Progress' : 'Closed'),\n  subject: b.subject || 'Appointment booking via voice assistant', classification: b.classification || 'Appointment Booking',\n  solution: b.solution || '', delegatedReason: b.delegatedReason || '', openedAt: op === 'create' ? now : (b.openedAt || ''), lastUpdate: now, op } }];"
+      },
+      "id": "24e951ba-9cf4-5f2b-9f44-278776034b05",
+      "name": "ComputeCase",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PENDING"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "caseId",
+              "condition": "eq",
+              "keyValue": "={{ $json.caseId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "caseId": "={{ $json.caseId }}",
+            "correlationId": "={{ $json.correlationId }}",
+            "status": "={{ $json.status }}",
+            "subject": "={{ $json.subject }}",
+            "classification": "={{ $json.classification }}",
+            "solution": "={{ $json.solution }}",
+            "delegatedReason": "={{ $json.delegatedReason }}",
+            "openedAt": "={{ $json.op === 'create' ? $json.openedAt : undefined }}",
+            "lastUpdate": "={{ $json.lastUpdate }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "caseId",
+              "displayName": "caseId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "correlationId",
+              "displayName": "correlationId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "classification",
+              "displayName": "classification",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "solution",
+              "displayName": "solution",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "delegatedReason",
+              "displayName": "delegatedReason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "openedAt",
+              "displayName": "openedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "lastUpdate",
+              "displayName": "lastUpdate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "f21adafc-80e1-55f5-85ed-f7ed15474683",
+      "name": "UpsertCase",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        416,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($('ComputeCase').first().json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "b3ea25fb-607e-52c9-84a4-b24c00003a5d",
+      "name": "RespondCase",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        624,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Mock case system\n\nCase numbers deterministic per correlationId; rows in ar_mock_cases.",
+        "width": 864,
+        "height": 336,
+        "color": 7
+      },
+      "id": "zone-01",
+      "name": "zone-01",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Mock case system\n\nOne endpoint, op in the body. Case numbers are deterministic from the correlation ID, so a re-created case is the same case.",
+        "width": 704,
+        "height": 256,
+        "color": 6
+      },
+      "id": "zone-panel-1",
+      "name": "zone-panel-1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -400
+      ]
+    }
+  ],
+  "connections": {
+    "ReceiveCaseOp": {
+      "main": [
+        [
+          {
+            "node": "ComputeCase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ComputeCase": {
+      "main": [
+        [
+          {
+            "node": "UpsertCase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "UpsertCase": {
+      "main": [
+        [
+          {
+            "node": "RespondCase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "Lab stand-in for the case API. POST ar-mock/casesys/case {op: create|update|close, correlationId, caseId, ...} -> case. Persists in ar_mock_cases."
+  },
+  "tags": [
+    "voice-booking",
+    "lab-stand-in"
+  ],
+  "project": "Voice Booking",
+  "folder": "Voice Booking Agent"
+}

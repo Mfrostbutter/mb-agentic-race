@@ -1,0 +1,197 @@
+{
+  "name": "AR-11 Tool: Find dealers",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "sessionId",
+              "type": "string"
+            },
+            {
+              "name": "city",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "517c8317-6a55-5156-af32-e180a14877bd",
+      "name": "ToolInput",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PENDING"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sessionId",
+              "condition": "eq",
+              "keyValue": "={{ $json.sessionId }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "id": "47b5b45c-5999-5c60-9e1a-16f7aee79e7e",
+      "name": "LoadSession",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/ar-mock/dealerbook/dealers",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ market: $json.market, city: $('ToolInput').first().json.city || '' }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "49b2f477-52cf-5525-98f3-4a1b1a1dedc4",
+      "name": "CallDealerBookDealers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        416,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $json;\nconst dealers = (r.dealers || []).slice(0, 5);\nreturn [{ json: { ok: true, count: dealers.length, dealers, note: dealers.length ? 'Offer at most two by name. Dealers with bookable false cannot be booked here.' : 'No dealer matched. Ask for another city or offer the preferred dealer.' } }];"
+      },
+      "id": "dc51ca55-855f-5882-85ca-74dc01530782",
+      "name": "ShapeDealers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Shapes a failed HTTP call into the sub-workflow's error contract. No throw: the caller branches on ok.\nconst e = $json.error || {};\nconst text = JSON.stringify(e);\nconst conflict = /409/.test(text);\nreturn [{ json: { ok: false, error: conflict ? 'slot_taken' : 'backend_unavailable',\n  message: conflict ? 'That slot was taken in the meantime. Call FindSlots again and offer new options.' : 'The backend system is unavailable. Apologise once and hand the caller to an agent (BACKEND_UNAVAILABLE).',\n  detail: String(e.message || '').slice(0, 200) } }];"
+      },
+      "id": "51994285-87b5-5fe4-8e8f-d8f37cfcd5c7",
+      "name": "ReturnDealersError",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Find dealers\n\nDealerBook dealer search by city; bookable tells the agent whether the dealer can be booked here.",
+        "width": 864,
+        "height": 624,
+        "color": 5
+      },
+      "id": "zone-01",
+      "name": "zone-01",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## AR-11 FindDealers\n\nMarket comes from the session row, city from the model. Non-bookable dealers are returned flagged so the agent routes them to a handoff.",
+        "width": 704,
+        "height": 256,
+        "color": 6
+      },
+      "id": "zone-panel-1",
+      "name": "zone-panel-1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -416
+      ]
+    }
+  ],
+  "connections": {
+    "ToolInput": {
+      "main": [
+        [
+          {
+            "node": "LoadSession",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LoadSession": {
+      "main": [
+        [
+          {
+            "node": "CallDealerBookDealers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CallDealerBookDealers": {
+      "main": [
+        [
+          {
+            "node": "ShapeDealers",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ReturnDealersError",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "Agent tool. Lists dealers for the session's market, optionally filtered by city. Inputs: sessionId (plumbed), city. Returns {ok, dealers:[{dealerId, name, city, bookable}]}."
+  },
+  "tags": [
+    "voice-booking",
+    "sub-workflow"
+  ],
+  "project": "Voice Booking",
+  "folder": "Voice Booking Agent"
+}

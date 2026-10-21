@@ -1,0 +1,33 @@
+{
+  "gutter": 16,
+  "zones": [
+    {
+      "title": "Health",
+      "body": "Probe for the gateway and the load balancer.",
+      "color": 4,
+      "nodes": [
+        "HealthCheck",
+        "RespondHealth"
+      ]
+    },
+    {
+      "title": "Handoff lookup",
+      "body": "Agent desktop context by correlationId: intent, reason, summary, case.",
+      "color": 4,
+      "nodes": [
+        "LookupHandoff",
+        "LoadByCorrelation",
+        "ShapeHandoffContext",
+        "RespondHandoffContext"
+      ]
+    }
+  ],
+  "panels": [
+    {
+      "title": "AR-05 Health and handoff lookup",
+      "body": "Health is unauthenticated and cheap. The lookup is header-authenticated and returns only what the agent desktop needs.",
+      "color": 6,
+      "width": 704
+    }
+  ]
+}

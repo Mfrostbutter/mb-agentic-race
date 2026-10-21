@@ -1,0 +1,35 @@
+{
+  "gutter": 16,
+  "zones": [
+    {
+      "title": "Receive",
+      "body": "NOTIFY result of the REFER, posted by the gateway.",
+      "color": 4,
+      "nodes": [
+        "ReceiveTransferResult",
+        "LoadSession",
+        "SessionFound",
+        "RespondNotFound"
+      ]
+    },
+    {
+      "title": "Decide",
+      "body": "First failure: speak and retry once. Second failure: speak and end. Success: release.",
+      "color": 5,
+      "nodes": [
+        "DecideTransferAction",
+        "UpdateTransfer",
+        "LogTransfer",
+        "RespondTransfer"
+      ]
+    }
+  ],
+  "panels": [
+    {
+      "title": "AR-04 Transfer result",
+      "body": "REFER acceptance is not completion. The outcome is stored on the session and the retry policy is one attempt.",
+      "color": 6,
+      "width": 704
+    }
+  ]
+}

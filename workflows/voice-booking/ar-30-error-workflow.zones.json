@@ -1,0 +1,23 @@
+{
+  "gutter": 16,
+  "zones": [
+    {
+      "title": "Error trigger",
+      "body": "Every AR-* failure lands in ar_events with workflow, node and message. Assign in Workflow Settings.",
+      "color": 3,
+      "nodes": [
+        "OnWorkflowError",
+        "ShapeError",
+        "InsertErrorEvent"
+      ]
+    }
+  ],
+  "panels": [
+    {
+      "title": "AR-30 Error workflow",
+      "body": "Assign in Workflow Settings > Error Workflow on every AR-* workflow. Writes to ar_events; wire a Teams or e-mail notification here on the production instance (different channel from the monitored one).",
+      "color": 6,
+      "width": 768
+    }
+  ]
+}

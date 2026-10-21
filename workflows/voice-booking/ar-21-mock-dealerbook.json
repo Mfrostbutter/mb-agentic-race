@@ -1,0 +1,858 @@
+{
+  "name": "AR-MOCK-DealerBook",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ar-mock/dealerbook/dealers",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f72d51dd-bad2-5d2e-b721-c7e2e114499f",
+      "name": "ReceiveDealers",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "ade5c7fd-7e42-5b3f-a9e4-353cf5f19230"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mock of dealer search. Real build: dealer booking API or the dealer directory.\nconst b = $json.body || {};\nconst all = [\n  { dealerId: 'PL-WAW-01', name: 'Dealer Warszawa Okęcie', city: 'Warszawa', market: 'PL', bookable: true },\n  { dealerId: 'PL-WAW-02', name: 'Dealer Warszawa Wola', city: 'Warszawa', market: 'PL', bookable: true },\n  { dealerId: 'PL-KRK-01', name: 'Dealer Kraków', city: 'Kraków', market: 'PL', bookable: true },\n  { dealerId: 'PL-GDA-01', name: 'Dealer Gdańsk', city: 'Gdańsk', market: 'PL', bookable: false },\n  { dealerId: 'ES-MAD-02', name: 'Dealer Madrid Castellana', city: 'Madrid', market: 'ES', bookable: true },\n  { dealerId: 'ES-BCN-01', name: 'Dealer Barcelona', city: 'Barcelona', market: 'ES', bookable: true },\n  { dealerId: 'DE-STR-01', name: 'Dealer Stuttgart Mitte', city: 'Stuttgart', market: 'DE', bookable: true },\n  { dealerId: 'GB-LON-01', name: 'Dealer London West', city: 'London', market: 'GB', bookable: true }\n];\nconst market = String(b.market || '').toUpperCase();\nconst city = String(b.city || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\nlet hits = all.filter(d => !market || d.market === market);\nif (b.dealerId) hits = hits.filter(d => d.dealerId === b.dealerId);\nif (city) hits = hits.filter(d => d.city.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').includes(city));\nreturn [{ json: { dealers: hits } }];"
+      },
+      "id": "f32e5d08-503f-56a2-a3e2-e61cbefbdc3c",
+      "name": "FilterDealers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "12a492e0-fa49-565b-8eea-cbc0f299efd2",
+      "name": "RespondDealers",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        416,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ar-mock/dealerbook/slots",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "8fef6d6c-e815-53e2-a25f-f61fe985db84",
+      "name": "ReceiveSlots",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        672,
+        0
+      ],
+      "webhookId": "8f384ade-2445-5c2c-bd6f-a2551239eade"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mock of DealerBook slot availability. Deterministic from dealerId and date so tests repeat.\nconst b = $json.body || {};\nconst dealerId = String(b.dealerId || '');\nconst names = { 'PL-WAW-01': 'Dealer Warszawa Okęcie', 'PL-WAW-02': 'Dealer Warszawa Wola', 'PL-KRK-01': 'Dealer Kraków', 'ES-MAD-02': 'Dealer Madrid Castellana', 'ES-BCN-01': 'Dealer Barcelona', 'DE-STR-01': 'Dealer Stuttgart Mitte', 'GB-LON-01': 'Dealer London West' };\nif (!names[dealerId]) return [{ json: { dealerId, dealerName: null, slots: [], reason: 'dealer_not_dealerbook_enabled' } }];\nlet from = new Date(b.fromDate || Date.now());\nif (isNaN(from.getTime())) from = new Date();\nfrom.setUTCHours(0, 0, 0, 0);\nconst seed = [...dealerId].reduce((a, ch) => a + ch.charCodeAt(0), 0);\nconst times = ['08:00', '10:30', '14:00'];\nconst slots = [];\nfor (let d = 1; d <= 10 && slots.length < 6; d++) {\n  const day = new Date(from.getTime() + d * 86400000);\n  if (day.getUTCDay() === 0) continue;\n  times.forEach((t, i) => { if ((seed + d + i) % 3 !== 0) slots.push({ slotId: `${dealerId}-${day.toISOString().slice(0,10).replace(/-/g,'')}-${t.replace(':','')}`, startsAt: `${day.toISOString().slice(0,10)}T${t}:00`, dealerId }); });\n}\nreturn [{ json: { dealerId, dealerName: names[dealerId], slots: slots.slice(0, 6) } }];"
+      },
+      "id": "05bbcf08-a4e3-51b2-9273-1991ea7429f8",
+      "name": "GenerateSlots",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "5de3e43d-68c0-5bcb-b30d-16cee78ac860",
+      "name": "RespondSlots",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1088,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ar-mock/dealerbook/book",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "13ed0a2c-6b2c-53f4-ad08-f5333a5b3306",
+      "name": "ReceiveBook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        384
+      ],
+      "webhookId": "9afd4e4c-572f-5f5f-9b75-dde7d3159e3f"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mock of DealerBook booking. Idempotent on idempotencyKey; a slotId containing FULL simulates a slot taken in the meantime.\nconst b = $json.body || {};\nconst key = String(b.idempotencyKey || '');\nconst slotId = String(b.slotId || '');\nif (!key || !slotId || !b.dealerId) return [{ json: { conflict: false, invalid: true, message: 'slotId, dealerId and idempotencyKey are required' } }];\nif (/FULL/.test(slotId)) return [{ json: { conflict: true, message: 'slot no longer available' } }];\nlet h = 0; for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0;\nconst code = 'BK-' + (h % 1000000).toString().padStart(6, '0');\nconst m = slotId.match(/-(\\d{8})-(\\d{4})$/);\nconst startsAt = m ? `${m[1].slice(0,4)}-${m[1].slice(4,6)}-${m[1].slice(6,8)}T${m[2].slice(0,2)}:${m[2].slice(2,4)}:00` : '';\nreturn [{ json: { conflict: false, invalid: false, bookingRef: key, confirmationCode: code, slotId, dealerId: b.dealerId, vin: b.vin || '', serviceType: b.serviceType || '', mobility: b.mobility || '', startsAt, status: 'booked', bookedAt: new Date().toISOString() } }];"
+      },
+      "id": "465dc2fd-ff59-5ae5-bcd4-a1275c7d12a3",
+      "name": "ComputeBooking",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3f57c127-cde5-5b63-95f7-2a34165392a7",
+              "leftValue": "={{ $json.conflict === true || $json.invalid === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "de96f662-f566-54ac-8c01-a266fe860909",
+      "name": "IsConflict",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        416,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: $json.invalid ? 'validation_error' : 'slot_taken', message: $json.message }) }}",
+        "options": {
+          "responseCode": "={{ $json.invalid ? 400 : 409 }}"
+        }
+      },
+      "id": "c60e31c7-4855-50e8-bc43-7abbe9c4cb2d",
+      "name": "RespondConflict",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        416,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PENDING"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "bookingRef",
+              "condition": "eq",
+              "keyValue": "={{ $json.bookingRef }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingRef": "={{ $json.bookingRef }}",
+            "confirmationCode": "={{ $json.confirmationCode }}",
+            "slotId": "={{ $json.slotId }}",
+            "dealerId": "={{ $json.dealerId }}",
+            "vin": "={{ $json.vin }}",
+            "serviceType": "={{ $json.serviceType }}",
+            "mobility": "={{ $json.mobility }}",
+            "startsAt": "={{ $json.startsAt }}",
+            "status": "={{ $json.status }}",
+            "bookedAt": "={{ $json.bookedAt }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "bookingRef",
+              "displayName": "bookingRef",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confirmationCode",
+              "displayName": "confirmationCode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "slotId",
+              "displayName": "slotId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "dealerId",
+              "displayName": "dealerId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "vin",
+              "displayName": "vin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "serviceType",
+              "displayName": "serviceType",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "mobility",
+              "displayName": "mobility",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "startsAt",
+              "displayName": "startsAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "bookedAt",
+              "displayName": "bookedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "13bdda65-1d21-57b9-a98a-40c4d852dfc3",
+      "name": "UpsertBooking",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        624,
+        384
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($('ComputeBooking').first().json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "4f3c4748-3760-52a4-8cfe-fc55d746c2cd",
+      "name": "RespondBooked",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        832,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ar-mock/dealerbook/bookings",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "c40becfb-5d59-5683-9300-aa283ce478f0",
+      "name": "ReceiveBookings",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        1040
+      ],
+      "webhookId": "da6c3f1a-221e-59df-abdd-24aefa44fcba"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PENDING"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "vin",
+              "condition": "eq",
+              "keyValue": "={{ $json.body.vin }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 20
+      },
+      "id": "3dc37aa1-2d08-5b7a-aef1-ba8258206bb5",
+      "name": "FindBookingsByVin",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        1040
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json).filter(r => r.bookingRef);\nreturn [{ json: { bookings: rows } }];"
+      },
+      "id": "53432292-067d-5468-89d3-c7b954a4f324",
+      "name": "ShapeBookings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "d61f7412-faad-55ad-8751-0f9be786e0e8",
+      "name": "RespondBookings",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        624,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ar-mock/dealerbook/cancel",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "2f0ddfcc-9226-57e7-ace5-87a5a6fd8a43",
+      "name": "ReceiveCancel",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        1088,
+        384
+      ],
+      "webhookId": "81039bc9-9ddb-5ac0-96f1-36d3ffeca5c0"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PENDING"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "bookingRef",
+              "condition": "eq",
+              "keyValue": "={{ $json.body.bookingRef }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "cancelled"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "bookingRef",
+              "displayName": "bookingRef",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confirmationCode",
+              "displayName": "confirmationCode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "slotId",
+              "displayName": "slotId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "dealerId",
+              "displayName": "dealerId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "vin",
+              "displayName": "vin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "serviceType",
+              "displayName": "serviceType",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "mobility",
+              "displayName": "mobility",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "startsAt",
+              "displayName": "startsAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "bookedAt",
+              "displayName": "bookedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "2482a173-b8ca-52f3-b0fc-16e35a14628f",
+      "name": "CancelBooking",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1296,
+        384
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, bookingRef: $('ReceiveCancel').first().json.body.bookingRef, status: 'cancelled' }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "77345d44-c589-567a-8077-d9fd528a4f79",
+      "name": "RespondCancelled",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1504,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Dealers\n\nFixture dealers per market.",
+        "width": 656,
+        "height": 336,
+        "color": 7
+      },
+      "id": "zone-01",
+      "name": "zone-01",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Slots\n\nDeterministic from dealerId and date so tests repeat.",
+        "width": 656,
+        "height": 336,
+        "color": 7
+      },
+      "id": "zone-02",
+      "name": "zone-02",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        608,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Book\n\nA slotId containing FULL answers 409. Bookings persist in ar_mock_bookings.",
+        "width": 1072,
+        "height": 608,
+        "color": 7
+      },
+      "id": "zone-03",
+      "name": "zone-03",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Cancel\n\nMarks the booking cancelled.",
+        "width": 656,
+        "height": 608,
+        "color": 7
+      },
+      "id": "zone-04",
+      "name": "zone-04",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1024,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Bookings by VIN\n\nLists bookings for reschedule and cancel flows.",
+        "width": 864,
+        "height": 336,
+        "color": 7
+      },
+      "id": "zone-05",
+      "name": "zone-05",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Mock DealerBook\n\nFive endpoints under ar-mock/dealerbook/*. Slots are deterministic per dealer and date. A slotId containing FULL returns 409. Bookings persist in ar_mock_bookings.",
+        "width": 768,
+        "height": 256,
+        "color": 6
+      },
+      "id": "zone-panel-1",
+      "name": "zone-panel-1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -400
+      ]
+    }
+  ],
+  "connections": {
+    "ReceiveDealers": {
+      "main": [
+        [
+          {
+            "node": "FilterDealers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FilterDealers": {
+      "main": [
+        [
+          {
+            "node": "RespondDealers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReceiveSlots": {
+      "main": [
+        [
+          {
+            "node": "GenerateSlots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GenerateSlots": {
+      "main": [
+        [
+          {
+            "node": "RespondSlots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReceiveBook": {
+      "main": [
+        [
+          {
+            "node": "ComputeBooking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ComputeBooking": {
+      "main": [
+        [
+          {
+            "node": "IsConflict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IsConflict": {
+      "main": [
+        [
+          {
+            "node": "RespondConflict",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "UpsertBooking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "UpsertBooking": {
+      "main": [
+        [
+          {
+            "node": "RespondBooked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReceiveBookings": {
+      "main": [
+        [
+          {
+            "node": "FindBookingsByVin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FindBookingsByVin": {
+      "main": [
+        [
+          {
+            "node": "ShapeBookings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ShapeBookings": {
+      "main": [
+        [
+          {
+            "node": "RespondBookings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReceiveCancel": {
+      "main": [
+        [
+          {
+            "node": "CancelBooking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CancelBooking": {
+      "main": [
+        [
+          {
+            "node": "RespondCancelled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "Lab stand-in for DealerBook (dealers, slots, book, bookings by VIN, cancel). Deterministic synthetic data. Replace with the dealer booking API."
+  },
+  "tags": [
+    "voice-booking",
+    "lab-stand-in"
+  ],
+  "project": "Voice Booking",
+  "folder": "Voice Booking Agent"
+}

@@ -1,0 +1,159 @@
+{
+  "name": "AR-10 Identify customer by VIN and MSISDN",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "vin",
+              "type": "string"
+            },
+            {
+              "name": "msisdn",
+              "type": "string"
+            },
+            {
+              "name": "correlationId",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "f35f65f7-ce09-5a7d-85f2-c6e0d2525206",
+      "name": "ToolInput",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/ar-mock/crm/customer-lookup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ vin: $json.vin, msisdn: $json.msisdn, correlationId: $json.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "414110aa-40f6-5be2-aa0d-b1fcfc30b0cc",
+      "name": "CallCrm",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        208,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $json;\nreturn [{ json: { ok: true, known: !!r.found, customerRef: r.customerRef || '', vehicleRef: r.vin || '', greetingName: r.greetingName || '', vehicleLabel: r.vehicleLabel || '', preferredDealerId: r.preferredDealerId || '', preferredDealerName: r.preferredDealerName || '', market: r.market || '', language: r.language || '' } }];"
+      },
+      "id": "573141af-0b20-53e6-a40a-996d6603352e",
+      "name": "ShapeCustomer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Shapes a failed HTTP call into the sub-workflow's error contract. No throw: the caller branches on ok.\nconst e = $json.error || {};\nconst text = JSON.stringify(e);\nconst conflict = /409/.test(text);\nreturn [{ json: { ok: false, error: conflict ? 'slot_taken' : 'backend_unavailable',\n  message: conflict ? 'That slot was taken in the meantime. Call FindSlots again and offer new options.' : 'The backend system is unavailable. Apologise once and hand the caller to an agent (BACKEND_UNAVAILABLE).',\n  detail: String(e.message || '').slice(0, 200) } }];"
+      },
+      "id": "99f1f1a6-3ffa-56ab-a0a0-ad63615bf74b",
+      "name": "ReturnCrmError",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Identify\n\nCRM lookup by VIN and number. Returns the greeting name and the vehicle label, never the identifiers.",
+        "width": 656,
+        "height": 624,
+        "color": 3
+      },
+      "id": "zone-01",
+      "name": "zone-01",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## AR-10 Identify customer\n\nIdentity is plumbed from the UUI, never from speech. The model never sees the VIN or the phone number.",
+        "width": 704,
+        "height": 256,
+        "color": 6
+      },
+      "id": "zone-panel-1",
+      "name": "zone-panel-1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -416
+      ]
+    }
+  ],
+  "connections": {
+    "ToolInput": {
+      "main": [
+        [
+          {
+            "node": "CallCrm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CallCrm": {
+      "main": [
+        [
+          {
+            "node": "ShapeCustomer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ReturnCrmError",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "Looks the caller up in CRM / customer master from the UUI identifiers. Inputs: vin, msisdn, correlationId. Returns {ok, known, customerRef, greetingName, vehicleLabel, preferredDealerId, preferredDealerName, market, language}. Called by AR-01, never by the model."
+  },
+  "tags": [
+    "voice-booking",
+    "sub-workflow"
+  ],
+  "project": "Voice Booking",
+  "folder": "Voice Booking Agent"
+}

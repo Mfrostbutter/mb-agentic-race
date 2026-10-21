@@ -1,0 +1,24 @@
+{
+  "gutter": 16,
+  "zones": [
+    {
+      "title": "case",
+      "body": "Create at start, close at end. Standard CRM case REST behind the mock.",
+      "color": 3,
+      "nodes": [
+        "ToolInput",
+        "CallCaseSystem",
+        "ShapeCase",
+        "ReturnCaseError"
+      ]
+    }
+  ],
+  "panels": [
+    {
+      "title": "AR-15 Case",
+      "body": "One case per call, created at session start, updated at the end. A standard REST API behind the mock.",
+      "color": 6,
+      "width": 704
+    }
+  ]
+}

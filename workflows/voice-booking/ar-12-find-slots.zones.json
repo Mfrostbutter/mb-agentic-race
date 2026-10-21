@@ -1,0 +1,34 @@
+{
+  "gutter": 16,
+  "zones": [
+    {
+      "title": "Find slots",
+      "body": "DealerBook availability for the agreed dealer from the requested date.",
+      "color": 5,
+      "nodes": [
+        "ToolInput",
+        "LoadSession",
+        "CallDealerBookSlots",
+        "ShapeSlots",
+        "ReturnSlotsError"
+      ]
+    },
+    {
+      "title": "Remember what was offered",
+      "body": "Offered slots are stored on the session so a booking can only name one of them.",
+      "color": 3,
+      "nodes": [
+        "StoreOffered",
+        "ReturnSlots"
+      ]
+    }
+  ],
+  "panels": [
+    {
+      "title": "AR-12 FindSlots",
+      "body": "The offered slots are written to the session row. BookAppointment refuses any slotId that was not offered in this call: slots are facts, not model output.",
+      "color": 6,
+      "width": 768
+    }
+  ]
+}

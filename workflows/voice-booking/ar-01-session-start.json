@@ -1,0 +1,1321 @@
+{
+  "name": "AR-01 API: Session start",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ar/v1/session/start",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "1c8f7e1c-4233-5a73-8b90-bdf5c0cc5d50",
+      "name": "ReceiveStart",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "428baa07-d9a2-5204-85b2-79eaa2ec39ac",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PENDING",
+          "name": "Gateway bearer"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validates the gateway's session/start call and parses the inbound UUI. The raw string wins over pre-parsed fields.\nconst b = $json.body || {};\nconst u = b.uui || {};\nconst raw = String(u.raw || '');\nconst parts = raw ? raw.split(';') : [];\nconst version = String(parts[0] || u.version || '').trim();\nconst correlationId = String(parts[1] || b.correlationId || '').trim();\nconst vin = String(parts[2] || u.vin || '').trim().toUpperCase();\nconst msisdn = String(parts[3] || u.msisdn || '').trim();\nconst language = String(parts[4] || u.language || '').trim().toLowerCase().slice(0, 2);\nconst errors = [];\nif (!correlationId) errors.push('correlationId missing');\nif (version !== '1') errors.push('unsupported uui version: ' + (version || 'none'));\nconst byPrefix = [['+48', 'PL'], ['+34', 'ES'], ['+49', 'DE'], ['+44', 'GB']];\nlet market = String(b.market || '').toUpperCase();\nif (!market) { const hit = byPrefix.find(([p]) => msisdn.startsWith(p)); market = hit ? hit[1] : ''; }\nif (!market) market = ({ pl: 'PL', es: 'ES', de: 'DE', en: 'GB' })[language] || 'PL';\nreturn [{ json: { valid: errors.length === 0, statusCode: errors.length ? 400 : 200, error: errors.length ? 'validation_error' : null, message: errors.join('; ') || null,\n  correlationId, version, vin, msisdn, language, market, uuiRaw: raw, sipCallId: (b.sip || {}).callId || '', gatewayVendor: (b.gateway || {}).vendor || '', startedAt: Date.now() } }];"
+      },
+      "id": "ab0da74a-79e8-52fd-9604-8beae975ae91",
+      "name": "ParseStart",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "68c9f2c4-3b4a-56db-ba76-6256e9068718",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "64bebce9-771d-5cc2-9079-70d18dfc46b8",
+      "name": "IsValid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        416,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: $json.error, message: $json.message }) }}",
+        "options": {
+          "responseCode": "={{ $json.statusCode }}"
+        }
+      },
+      "id": "a9748d5d-0cf5-5de3-b81c-5f49ae1c15bb",
+      "name": "RespondInvalid",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        416,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PENDING"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "correlationId",
+              "condition": "eq",
+              "keyValue": "={{ $json.correlationId }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "id": "c93d9cea-6f69-5fd9-b8b5-d4642c509a0a",
+      "name": "CheckExisting",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9b4f4d07-fd99-585a-8589-2847e36c83d1",
+              "leftValue": "={{ $json.sessionId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3f809242-0dc1-5efb-bc68-7611b0e21653",
+      "name": "AlreadyStarted",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const s = $json;\nreturn [{ json: { sessionId: s.sessionId, correlationId: s.correlationId, caseId: s.caseId, market: s.market, language: s.language, state: s.state, customer: { known: !!s.customerRef, greetingName: s.greetingName, vehicle: s.vehicleLabel }, speak: '', action: 'continue', handoff: null, listen: true, duplicate: true } }];"
+      },
+      "id": "0033ac2a-2b66-563b-930f-0be43296327e",
+      "name": "ShapeExisting",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "d3478c7f-5e01-5e34-85df-e009937ba078",
+      "name": "RespondExisting",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        880,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PENDING"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "market",
+              "condition": "eq",
+              "keyValue": "={{ $('ParseStart').first().json.market }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "id": "62372c11-4b1e-53bd-ad4a-52bf5e0bd1d0",
+      "name": "LoadMarket",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1136,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "PENDING_ar-10-identify-customer",
+          "mode": "list",
+          "cachedResultName": "AR-10 Identify customer by VIN and MSISDN"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "vin": "={{ $('ParseStart').first().json.vin }}",
+            "msisdn": "={{ $('ParseStart').first().json.msisdn }}",
+            "correlationId": "={{ $('ParseStart').first().json.correlationId }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "vin",
+              "displayName": "vin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "msisdn",
+              "displayName": "msisdn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "correlationId",
+              "displayName": "correlationId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "3a285957-d00f-5831-83d5-91220bb310d7",
+      "name": "IdentifyCustomer",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1344,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "PENDING_ar-15-case-system",
+          "mode": "list",
+          "cachedResultName": "AR-15 Case create, update or close"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "op": "create",
+            "correlationId": "={{ $('ParseStart').first().json.correlationId }}",
+            "caseId": "",
+            "subject": "Appointment booking via voice assistant",
+            "classification": "Appointment Booking",
+            "status": "In Progress",
+            "solution": "",
+            "delegatedReason": ""
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "op",
+              "displayName": "op",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "correlationId",
+              "displayName": "correlationId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "caseId",
+              "displayName": "caseId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "classification",
+              "displayName": "classification",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "solution",
+              "displayName": "solution",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "delegatedReason",
+              "displayName": "delegatedReason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "c5e1cf94-6ac4-55ba-a146-90de5b0b63f4",
+      "name": "CreateCase",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1552,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Creates the session row content, the greeting and the first instruction for the gateway.\nconst p = $('ParseStart').first().json;\nconst m = $('LoadMarket').first().json;\nconst c = $('IdentifyCustomer').first().json;\nconst k = $('CreateCase').first().json;\nconst alphabet = 'ABCDEFGHJKMNPQRSTVWXYZ23456789';\nlet sessionId = ''; for (let i = 0; i < 8; i++) sessionId += alphabet[Math.floor(Math.random() * alphabet.length)];\nconst langs = String(m.languages || '').split(',').map(x => x.trim());\nconst language = p.language && langs.includes(p.language) ? p.language : (m.defaultLanguage || 'en');\nconst disclosure = m['disclosure_' + language] || m.disclosure_en || '';\nconst known = !!(c.ok && c.known);\nconst name = known ? c.greetingName : '';\nconst veh = known ? c.vehicleLabel : '';\nconst greetings = {\n  pl: `Dzień dobry${name ? ', ' + name : ''}. W czym mogę pomóc w związku z wizytą serwisową${veh ? ' dla Państwa ' + veh : ''}?`,\n  es: `Buenos días${name ? ', ' + name : ''}. ¿En qué puedo ayudarle con su cita de taller${veh ? ' para su ' + veh : ''}?`,\n  de: `Guten Tag${name ? ', ' + name : ''}. Wie kann ich Ihnen bei Ihrem Werkstatttermin${veh ? ' für Ihren ' + veh : ''} helfen?`,\n  en: `Hello${name ? ', ' + name : ''}. How can I help with your service appointment${veh ? ' for your ' + veh : ''}?`\n};\nconst backendDown = c.ok === false || k.ok === false;\nreturn [{ json: { sessionId, correlationId: p.correlationId, caseId: k.caseId || '', market: m.market || p.market, language,\n  state: backendDown ? 'HANDOFF' : 'IDENTIFY', intent: 'UNKNOWN', customerRef: known ? c.customerRef : '', vehicleRef: p.vin,\n  greetingName: name, vehicleLabel: veh, dealerId: known ? (c.preferredDealerId || '') : '', dealerName: known ? (c.preferredDealerName || '') : '',\n  offeredSlots: '[]', turns: 0, startedAt: new Date(p.startedAt).toISOString(), known, backendDown,\n  handoffReason: backendDown ? 'BACKEND_UNAVAILABLE' : '',\n  speak: backendDown ? (m.handoverLine || '') : (disclosure + ' ' + (greetings[language] || greetings.en)).trim() } }];"
+      },
+      "id": "57ecd0e6-d6a1-54b3-b70b-bf4531096f1a",
+      "name": "ComposeSession",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PENDING"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "sessionId": "={{ $json.sessionId }}",
+            "correlationId": "={{ $json.correlationId }}",
+            "caseId": "={{ $json.caseId }}",
+            "market": "={{ $json.market }}",
+            "language": "={{ $json.language }}",
+            "state": "={{ $json.state }}",
+            "intent": "={{ $json.intent }}",
+            "customerRef": "={{ $json.customerRef }}",
+            "vehicleRef": "={{ $json.vehicleRef }}",
+            "greetingName": "={{ $json.greetingName }}",
+            "vehicleLabel": "={{ $json.vehicleLabel }}",
+            "dealerId": "={{ $json.dealerId }}",
+            "dealerName": "={{ $json.dealerName }}",
+            "offeredSlots": "={{ $json.offeredSlots }}",
+            "turns": "={{ $json.turns }}",
+            "startedAt": "={{ $json.startedAt }}",
+            "handoffReason": "={{ $json.handoffReason }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "correlationId",
+              "displayName": "correlationId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "caseId",
+              "displayName": "caseId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "market",
+              "displayName": "market",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "language",
+              "displayName": "language",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "intent",
+              "displayName": "intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "customerRef",
+              "displayName": "customerRef",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "vehicleRef",
+              "displayName": "vehicleRef",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "greetingName",
+              "displayName": "greetingName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "vehicleLabel",
+              "displayName": "vehicleLabel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "dealerId",
+              "displayName": "dealerId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "dealerName",
+              "displayName": "dealerName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "offeredSlots",
+              "displayName": "offeredSlots",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "slotId",
+              "displayName": "slotId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "bookingRef",
+              "displayName": "bookingRef",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confirmationCode",
+              "displayName": "confirmationCode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confirmationChannel",
+              "displayName": "confirmationChannel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confirmationSent",
+              "displayName": "confirmationSent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "handoffReason",
+              "displayName": "handoffReason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "handoffResult",
+              "displayName": "handoffResult",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "handoffSummary",
+              "displayName": "handoffSummary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "turns",
+              "displayName": "turns",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "startedAt",
+              "displayName": "startedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "endedAt",
+              "displayName": "endedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "endReason",
+              "displayName": "endReason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "lastLatencyMs",
+              "displayName": "lastLatencyMs",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "7c9ca344-a1f8-5460-9f77-ff8bad03e5ac",
+      "name": "InsertSession",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "PENDING_ar-17-log-event",
+          "mode": "list",
+          "cachedResultName": "AR-17 Log event"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "correlationId": "={{ $('ComposeSession').first().json.correlationId }}",
+            "sessionId": "={{ $('ComposeSession').first().json.sessionId }}",
+            "caseId": "={{ $('ComposeSession').first().json.caseId }}",
+            "workflow": "AR-01",
+            "event": "session_start",
+            "state": "={{ $('ComposeSession').first().json.state }}",
+            "tool": "",
+            "latencyMs": "={{ Date.now() - new Date($('ComposeSession').first().json.startedAt).getTime() }}",
+            "outcome": "={{ $('ComposeSession').first().json.backendDown ? 'handoff' : 'continue' }}",
+            "errorCode": "={{ $('ComposeSession').first().json.backendDown ? 'backend_unavailable' : '' }}",
+            "detail": "={{ 'known=' + $('ComposeSession').first().json.known + ' market=' + $('ComposeSession').first().json.market + ' lang=' + $('ComposeSession').first().json.language }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "correlationId",
+              "displayName": "correlationId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "caseId",
+              "displayName": "caseId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "event",
+              "displayName": "event",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "tool",
+              "displayName": "tool",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "latencyMs",
+              "displayName": "latencyMs",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "outcome",
+              "displayName": "outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "errorCode",
+              "displayName": "errorCode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "detail",
+              "displayName": "detail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "fd0ede92-4906-5b8a-b275-b81bfbf2e8b7",
+      "name": "LogStart",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        416,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cabe5232-db0b-5e16-bde5-09b3604c7d2b",
+              "leftValue": "={{ $('ComposeSession').first().json.backendDown }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "62a283dc-f5a1-54a3-9508-78bd498af8f8",
+      "name": "BackendDown",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "PENDING_ar-14-build-handoff",
+          "mode": "list",
+          "cachedResultName": "AR-14 Build handoff context"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "sessionId": "={{ $('ComposeSession').first().json.sessionId }}",
+            "intent": "UNKNOWN",
+            "handoffReason": "BACKEND_UNAVAILABLE",
+            "summary": "Backend unavailable at session start"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "intent",
+              "displayName": "intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "handoffReason",
+              "displayName": "handoffReason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "55832fe3-116e-53ff-b741-1421df3fb9e5",
+      "name": "BuildStartHandoff",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        880,
+        944
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Response contract for session/start (section 4.1 of the spec).\nconst s = $('ComposeSession').first().json;\nlet handoff = null;\nif (s.backendDown) { try { const h = $('BuildStartHandoff').first().json; handoff = { intent: 'UNKNOWN', handoffReason: 'BACKEND_UNAVAILABLE', caseId: s.caseId, uuiPayload: h.uuiPayload, uuiHex: h.uuiHex, uuiAscii: h.uuiAscii, referTo: h.referTo }; } catch (e) { handoff = { intent: 'UNKNOWN', handoffReason: 'BACKEND_UNAVAILABLE', caseId: s.caseId, error: 'handoff_build_failed' }; } }\nreturn [{ json: { sessionId: s.sessionId, correlationId: s.correlationId, caseId: s.caseId, market: s.market, language: s.language, state: s.state,\n  customer: { known: s.known, greetingName: s.greetingName, vehicle: s.vehicleLabel }, speak: s.speak, action: s.backendDown ? 'handoff' : 'continue', handoff, listen: !s.backendDown, latencyMs: Date.now() - new Date(s.startedAt).getTime() } }];"
+      },
+      "id": "29ba2996-1a3f-542c-a9bb-d0188c5706c8",
+      "name": "ShapeStart",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "686f41c1-e669-50ff-9203-2dbcafecc91f",
+      "name": "RespondStart",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1088,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Receive\n\nThe gateway posts the SIP UUI once the INVITE is answered. Header auth; a malformed body answers 400 and the call is released.",
+        "width": 656,
+        "height": 624,
+        "color": 4
+      },
+      "id": "zone-01",
+      "name": "zone-01",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Idempotency\n\nA re-delivered correlationId returns the existing session without speaking again.",
+        "width": 448,
+        "height": 624,
+        "color": 5
+      },
+      "id": "zone-02",
+      "name": "zone-02",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        608,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Identify and open the case\n\nMarket row, CRM lookup by VIN, case. The model never sees the VIN or the number.",
+        "width": 656,
+        "height": 624,
+        "color": 3
+      },
+      "id": "zone-03",
+      "name": "zone-03",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1072,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Session\n\nOne row in ar_sessions per call; state starts at IDENTIFY. Every start is logged to ar_events.",
+        "width": 656,
+        "height": 624,
+        "color": 3
+      },
+      "id": "zone-04",
+      "name": "zone-04",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Greet or hand over\n\nBackend down at start: the handover payload is built here and the greeting becomes the handover line.",
+        "width": 656,
+        "height": 624,
+        "color": 4
+      },
+      "id": "zone-05",
+      "name": "zone-05",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        608,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## AR-01 Session start\n\nGateway calls this once the INVITE is answered. Header auth. Re-delivery of a known correlationId returns the existing session without speaking again.",
+        "width": 816,
+        "height": 256,
+        "color": 6
+      },
+      "id": "zone-panel-1",
+      "name": "zone-panel-1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -416
+      ]
+    }
+  ],
+  "connections": {
+    "ReceiveStart": {
+      "main": [
+        [
+          {
+            "node": "ParseStart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ParseStart": {
+      "main": [
+        [
+          {
+            "node": "IsValid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IsValid": {
+      "main": [
+        [
+          {
+            "node": "CheckExisting",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RespondInvalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CheckExisting": {
+      "main": [
+        [
+          {
+            "node": "AlreadyStarted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AlreadyStarted": {
+      "main": [
+        [
+          {
+            "node": "ShapeExisting",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "LoadMarket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ShapeExisting": {
+      "main": [
+        [
+          {
+            "node": "RespondExisting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LoadMarket": {
+      "main": [
+        [
+          {
+            "node": "IdentifyCustomer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IdentifyCustomer": {
+      "main": [
+        [
+          {
+            "node": "CreateCase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CreateCase": {
+      "main": [
+        [
+          {
+            "node": "ComposeSession",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ComposeSession": {
+      "main": [
+        [
+          {
+            "node": "InsertSession",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "InsertSession": {
+      "main": [
+        [
+          {
+            "node": "LogStart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LogStart": {
+      "main": [
+        [
+          {
+            "node": "BackendDown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BackendDown": {
+      "main": [
+        [
+          {
+            "node": "BuildStartHandoff",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ShapeStart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BuildStartHandoff": {
+      "main": [
+        [
+          {
+            "node": "ShapeStart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ShapeStart": {
+      "main": [
+        [
+          {
+            "node": "RespondStart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "POST /webhook/ar/v1/session/start. Parses the contact-center UUI, identifies the customer, opens the case, creates the session and returns the AI disclosure plus greeting. Idempotent on correlationId."
+  },
+  "tags": [
+    "voice-booking",
+    "api"
+  ],
+  "project": "Voice Booking",
+  "folder": "Voice Booking Agent"
+}

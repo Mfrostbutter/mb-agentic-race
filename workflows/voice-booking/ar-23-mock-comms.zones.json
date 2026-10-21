@@ -1,0 +1,23 @@
+{
+  "gutter": 16,
+  "zones": [
+    {
+      "title": "Mock comms",
+      "body": "Returns a message id, sends nothing.",
+      "color": 7,
+      "nodes": [
+        "ReceiveSend",
+        "ComputeMessage",
+        "RespondSend"
+      ]
+    }
+  ],
+  "panels": [
+    {
+      "title": "Mock communication service",
+      "body": "Returns a message id. The real service resolves the customer's number or address from the CRM reference, so n8n never stores it.",
+      "color": 6,
+      "width": 704
+    }
+  ]
+}

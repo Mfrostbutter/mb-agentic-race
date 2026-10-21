@@ -1,0 +1,26 @@
+{
+  "gutter": 16,
+  "zones": [
+    {
+      "title": "Seed",
+      "body": "Upserts ar_markets and ar_codes. Run once per environment; safe to re-run.",
+      "color": 6,
+      "nodes": [
+        "ReceiveSeed",
+        "MarketRows",
+        "UpsertMarket",
+        "CodeRows",
+        "UpsertCode",
+        "RespondSeeded"
+      ]
+    }
+  ],
+  "panels": [
+    {
+      "title": "AR-90 Seed config",
+      "body": "Markets and codes are data, not prompt text: a new market is one row here. Disclosure texts are placeholders until Legal supplies the market wording.",
+      "color": 6,
+      "width": 768
+    }
+  ]
+}

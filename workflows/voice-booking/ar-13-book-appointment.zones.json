@@ -1,0 +1,36 @@
+{
+  "gutter": 16,
+  "zones": [
+    {
+      "title": "Validate",
+      "body": "The slot must be one offered in this call, read back in CONFIRM, and confirmed in a later turn.",
+      "color": 5,
+      "nodes": [
+        "ToolInput",
+        "LoadSession",
+        "ValidateSlot",
+        "CanProceed",
+        "ReturnValidation"
+      ]
+    },
+    {
+      "title": "Book",
+      "body": "Idempotency key session:slot. The confirmation code comes from DealerBook, never from the model.",
+      "color": 3,
+      "nodes": [
+        "CallDealerBookBook",
+        "StoreBooking",
+        "ReturnBooking",
+        "ReturnBookError"
+      ]
+    }
+  ],
+  "panels": [
+    {
+      "title": "AR-13 BookAppointment",
+      "body": "Validates the slotId against the session, books with an idempotency key, writes bookingRef and confirmationCode to the session, sets state BOOKED. The spoken confirmation is built from this result, never from the model.",
+      "color": 6,
+      "width": 816
+    }
+  ]
+}

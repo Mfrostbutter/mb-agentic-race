@@ -1,0 +1,66 @@
+{
+  "gutter": 16,
+  "zones": [
+    {
+      "title": "Receive",
+      "body": "The gateway posts the SIP UUI once the INVITE is answered. Header auth; a malformed body answers 400 and the call is released.",
+      "color": 4,
+      "nodes": [
+        "ReceiveStart",
+        "ParseStart",
+        "IsValid",
+        "RespondInvalid"
+      ]
+    },
+    {
+      "title": "Idempotency",
+      "body": "A re-delivered correlationId returns the existing session without speaking again.",
+      "color": 5,
+      "nodes": [
+        "CheckExisting",
+        "AlreadyStarted",
+        "ShapeExisting",
+        "RespondExisting"
+      ]
+    },
+    {
+      "title": "Identify and open the case",
+      "body": "Market row, CRM lookup by VIN, case. The model never sees the VIN or the number.",
+      "color": 3,
+      "nodes": [
+        "LoadMarket",
+        "IdentifyCustomer",
+        "CreateCase"
+      ]
+    },
+    {
+      "title": "Session",
+      "body": "One row in ar_sessions per call; state starts at IDENTIFY. Every start is logged to ar_events.",
+      "color": 3,
+      "nodes": [
+        "ComposeSession",
+        "InsertSession",
+        "LogStart"
+      ]
+    },
+    {
+      "title": "Greet or hand over",
+      "body": "Backend down at start: the handover payload is built here and the greeting becomes the handover line.",
+      "color": 4,
+      "nodes": [
+        "BackendDown",
+        "ShapeStart",
+        "RespondStart",
+        "BuildStartHandoff"
+      ]
+    }
+  ],
+  "panels": [
+    {
+      "title": "AR-01 Session start",
+      "body": "Gateway calls this once the INVITE is answered. Header auth. Re-delivery of a known correlationId returns the existing session without speaking again.",
+      "color": 6,
+      "width": 816
+    }
+  ]
+}

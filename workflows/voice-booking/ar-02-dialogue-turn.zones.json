@@ -1,0 +1,80 @@
+{
+  "gutter": 16,
+  "zones": [
+    {
+      "title": "Receive",
+      "body": "One turn per call: sessionId, transcript, ASR confidence.",
+      "color": 4,
+      "nodes": [
+        "ReceiveTurn",
+        "ValidateTurn",
+        "IsValid",
+        "RespondInvalid"
+      ]
+    },
+    {
+      "title": "Load state",
+      "body": "The session row and the market row are the only state the model sees.",
+      "color": 3,
+      "nodes": [
+        "LoadSession",
+        "SessionFound",
+        "LoadMarket",
+        "RespondNotFound"
+      ]
+    },
+    {
+      "title": "Reason",
+      "body": "PrepareTurn rebuilds the system prompt from facts and applies the yes/no gates. The agent has three tools, Postgres memory and a structured parser with auto-fix.",
+      "color": 5,
+      "nodes": [
+        "PrepareTurn",
+        "DialogueAgent",
+        "DialogueModel",
+        "TurnMemory",
+        "TurnOutputShape",
+        "FindDealers",
+        "FindSlots",
+        "BookAppointment",
+        "ParserFixerModel"
+      ]
+    },
+    {
+      "title": "Guard",
+      "body": "Code decides: no booking claim without a code, caller-request rule, gate advance, handover line. Handoff builds the Refer-To here.",
+      "color": 5,
+      "nodes": [
+        "ReloadSession",
+        "ApplyGuards",
+        "NeedsHandoff",
+        "BuildHandoff",
+        "HandleAgentError"
+      ]
+    },
+    {
+      "title": "Respond",
+      "body": "Session update, event row, the reply the gateway speaks.",
+      "color": 4,
+      "nodes": [
+        "ComposeResponse",
+        "UpdateSession",
+        "LogTurn",
+        "RespondTurn"
+      ]
+    }
+  ],
+  "panels": [
+    {
+      "title": "AR-02 Dialogue turn",
+      "body": "The brain. State lives in ar_sessions; the system prompt is rebuilt every turn. Guards after the model: no booking claim without a confirmation code, no slot that was not offered, no end before WRAPUP.",
+      "color": 6,
+      "width": 896
+    },
+    {
+      "title": "Tools",
+      "body": "FindDealers, FindSlots, BookAppointment. sessionId is plumbed, never a model parameter. Handoff is not a tool: it is a deterministic consequence of action=handoff.",
+      "color": 6,
+      "width": 704
+    }
+  ]
+}
