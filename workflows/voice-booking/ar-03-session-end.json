@@ -49,7 +49,7 @@
           },
           "conditions": [
             {
-              "id": "119a36f5-c6c0-573f-a7e7-a456b7915d6c",
+              "id": "a0a66086-937c-57e0-8762-04fa18556234",
               "leftValue": "={{ $json.valid }}",
               "rightValue": "",
               "operator": {
@@ -131,7 +131,7 @@
           },
           "conditions": [
             {
-              "id": "80f8ca39-85af-5548-a332-48e9aabdc8b6",
+              "id": "289b7b6e-2808-5749-a5ba-733b74b87ca0",
               "leftValue": "={{ $json.sessionId }}",
               "rightValue": "",
               "operator": {
@@ -315,7 +315,7 @@
           },
           "conditions": [
             {
-              "id": "7f424e25-4574-53f3-abd5-a97991622af1",
+              "id": "cddf407c-2d5d-53fd-85dc-534ca931c4af",
               "leftValue": "={{ $('DecideOutcome').first().json.needsConfirmation }}",
               "rightValue": "",
               "operator": {

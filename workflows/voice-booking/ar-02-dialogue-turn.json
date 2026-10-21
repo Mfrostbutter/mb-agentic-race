@@ -49,7 +49,7 @@
           },
           "conditions": [
             {
-              "id": "3ff64a24-b36c-56cf-af72-292457cf580a",
+              "id": "4e92b7cb-56f3-598c-a608-17d4fe065584",
               "leftValue": "={{ $json.valid }}",
               "rightValue": "",
               "operator": {
@@ -131,7 +131,7 @@
           },
           "conditions": [
             {
-              "id": "7ce88f9e-9529-565e-a83f-c6cf29e4ab53",
+              "id": "70eca1f6-3c3b-55ba-a908-caf6444271f1",
               "leftValue": "={{ $json.sessionId }}",
               "rightValue": "",
               "operator": {
@@ -560,35 +560,194 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        848,
-        672
+        0,
+        1616
       ],
       "alwaysOutputData": true
     },
     {
       "parameters": {
-        "jsCode": "// Deterministic guards on the model's structured output. Runs after the session was re-read, so a booking made by a tool in this turn is visible.\nconst prep = $('PrepareTurn').first().json;\nconst agent = $('DialogueAgent').first().json;\nconst s = $json;\nlet out = agent.output;\nif (typeof out === 'string') { try { out = JSON.parse(out); } catch (e) { out = { speak: out }; } }\nout = out || {};\nconst states = ['IDENTIFY','CONSENT','NEED','DEALER','SLOT','CONFIRM','BOOKED','WRAPUP','HANDOFF'];\nconst intents = ['BOOK','RESCHEDULE','CANCEL','OTHER','UNKNOWN'];\nconst reasons = ['CALLER_REQUEST','SCENARIO_REQUIRES_AGENT','NOT_UNDERSTOOD','BACKEND_UNAVAILABLE','IDENTIFICATION_FAILED','NO_SLOT','POLICY','PLATFORM_ERROR'];\nconst L = prep.language;\nconst t = (o) => o[L] || o.en;\nconst guards = [];\nlet speak = String(out.speak || '').trim();\nlet action = ['continue','handoff','end'].includes(out.action) ? out.action : 'continue';\nlet state = states.includes(out.state) ? out.state : prep.state;\nlet intent = intents.includes(out.intent) ? out.intent : 'UNKNOWN';\nlet handoffReason = reasons.includes(out.handoffReason) ? out.handoffReason : null;\nconst booked = !!s.bookingRef;\nif (prep.gateDecline && !booked && action !== 'handoff') { action = 'handoff'; handoffReason = prep.gateDecline; guards.push('gate_decline'); }\nif (prep.gateAdvanced && action === 'continue' && states.indexOf(state) < states.indexOf(prep.state)) { state = prep.state; guards.push('gate_advance'); }\nif (prep.gateAdvanced && action === 'handoff' && handoffReason === 'SCENARIO_REQUIRES_AGENT') { action = 'continue'; state = prep.state; handoffReason = null; speak = ''; guards.push('scenario_downgrade'); }\nconst asksForHuman = /(\\b(agent|human|person|operator|someone real|real person)\\b|konsultant|cz[łl]owiek|pracownik|doradc|persona|humano|agente|operador|mitarbeiter|mensch|berater|echte person)/i.test(prep.chatInput || '') && !/\\b(no|nie|nein|not|kein)\\b[^.]{0,12}(agent|human|person|konsultant|persona|mitarbeiter)/i.test(prep.chatInput || '');\nif (asksForHuman && action !== 'handoff' && !booked) { action = 'handoff'; handoffReason = 'CALLER_REQUEST'; guards.push('caller_request_rule'); }\nlet pendingSlotId = prep.pendingSlotId || '';\nconst offeredIds = prep.offeredSlotIds || [];\nif (state === 'CONFIRM' && out.slotId && offeredIds.includes(String(out.slotId))) { pendingSlotId = String(out.slotId); guards.push('pending_slot_set'); }\nif (state !== 'CONFIRM' && !booked) pendingSlotId = '';\nconst claimsBooking = /((is|has been|was|are|'s) (now |all )?(booked|confirmed|reserved|scheduled)|confirmation code|zosta[łl][ao]? (zarezerwowan|potwierdzon|umówion)|kod potwierdzenia|(ha sido|está|queda) (reservad|confirmad)|código de confirmación|(ist|wurde) (gebucht|bestätigt|reserviert)|bestätigungscode)/i.test(speak);\nif (claimsBooking && !booked) {\n  guards.push('false_confirmation');\n  speak = t({ pl: 'Jeszcze nie zarezerwowałem terminu. Czy mam go teraz zarezerwować?', es: 'Todavía no he reservado la cita. ¿Quiere que la reserve ahora?', de: 'Ich habe den Termin noch nicht gebucht. Soll ich ihn jetzt buchen?', en: 'I have not booked the appointment yet. Shall I book it now?' });\n  if (state === 'BOOKED' || state === 'WRAPUP') state = 'CONFIRM';\n  if (action === 'end') action = 'continue';\n}\nif (booked && !['BOOKED','WRAPUP','HANDOFF'].includes(state)) { state = 'BOOKED'; guards.push('state_forced_booked'); }\nif (!speak) { guards.push('empty_reply'); speak = t({ pl: 'Przepraszam, czy mogą Państwo powtórzyć?', es: 'Disculpe, ¿puede repetirlo?', de: 'Entschuldigung, können Sie das wiederholen?', en: 'Sorry, could you repeat that?' }); }\nif (speak.length > 400) { guards.push('reply_truncated'); speak = speak.slice(0, 397) + '...'; }\nif (action === 'handoff') { state = 'HANDOFF'; if (!handoffReason) { handoffReason = 'CALLER_REQUEST'; guards.push('reason_defaulted'); } if (prep.handoverLine) { speak = prep.handoverLine; guards.push('handover_line'); } }\nif (state === 'HANDOFF' && action !== 'handoff') { action = 'handoff'; handoffReason = handoffReason || 'SCENARIO_REQUIRES_AGENT'; guards.push('action_forced_handoff'); if (prep.handoverLine) speak = prep.handoverLine; }\nif (action === 'end' && !['BOOKED','WRAPUP'].includes(state)) { guards.push('end_blocked'); action = 'continue'; }\nif (action === 'end') state = 'WRAPUP';\nreturn [{ json: { sessionId: prep.sessionId, correlationId: prep.correlationId, caseId: prep.caseId, language: L, speak, action, state, intent, handoffReason, summary: String(out.summary || '').slice(0, 500),\n  confidence: typeof out.confidence === 'number' ? out.confidence : null, guards, needsHandoff: action === 'handoff', turn: prep.turn, startedAt: prep.startedAt, bookingRef: s.bookingRef || '', confirmationCode: s.confirmationCode || '', pendingSlotId, errorCode: guards.length ? guards.join(',') : '' } }];"
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1b17b105-012b-5b37-968e-3bfeb3cb458e",
+              "name": "out",
+              "value": "={{ typeof $('DialogueAgent').first().json.output === 'string' ? { speak: $('DialogueAgent').first().json.output } : ($('DialogueAgent').first().json.output || {}) }}",
+              "type": "object"
+            },
+            {
+              "id": "fa3ff289-f251-54b5-9651-32b157f39c3e",
+              "name": "sessionId",
+              "value": "={{ $('PrepareTurn').first().json.sessionId }}",
+              "type": "string"
+            },
+            {
+              "id": "64eb8859-fa59-5c62-900b-250856507008",
+              "name": "correlationId",
+              "value": "={{ $('PrepareTurn').first().json.correlationId }}",
+              "type": "string"
+            },
+            {
+              "id": "18e106c5-500e-534e-b65d-a0836e5d2e34",
+              "name": "caseId",
+              "value": "={{ $('PrepareTurn').first().json.caseId || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "bcda4041-7640-5d22-8340-d5efd8cfdbd1",
+              "name": "language",
+              "value": "={{ $('PrepareTurn').first().json.language }}",
+              "type": "string"
+            },
+            {
+              "id": "0c70b6b8-1c95-500c-bc68-6c5074b9f2ff",
+              "name": "turn",
+              "value": "={{ $('PrepareTurn').first().json.turn }}",
+              "type": "number"
+            },
+            {
+              "id": "b9d94d64-c057-5d4c-9db6-9ad6185fc70f",
+              "name": "startedAt",
+              "value": "={{ $('PrepareTurn').first().json.startedAt }}",
+              "type": "number"
+            },
+            {
+              "id": "f0a63dac-22ae-5487-a24a-708f5e66b94b",
+              "name": "prepState",
+              "value": "={{ $('PrepareTurn').first().json.state }}",
+              "type": "string"
+            },
+            {
+              "id": "f951e768-b3a5-53a2-83fd-e5cb8e09ef44",
+              "name": "gateDecline",
+              "value": "={{ $('PrepareTurn').first().json.gateDecline || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "9d411f0a-de21-5fa7-bc13-a3c8eee9d11a",
+              "name": "gateAdvanced",
+              "value": "={{ $('PrepareTurn').first().json.gateAdvanced === true }}",
+              "type": "boolean"
+            },
+            {
+              "id": "d0a1e846-8972-558f-996f-25d90f803661",
+              "name": "handoverLine",
+              "value": "={{ $('PrepareTurn').first().json.handoverLine || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "8c745773-2f82-56a9-bde1-c66d6add0010",
+              "name": "chatInput",
+              "value": "={{ String($('PrepareTurn').first().json.chatInput || '').toLowerCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "49b83065-6866-55e9-8eae-20b61b07bd6e",
+              "name": "offeredSlotIds",
+              "value": "={{ $('PrepareTurn').first().json.offeredSlotIds || [] }}",
+              "type": "array"
+            },
+            {
+              "id": "977404d1-d02e-55c0-936e-7c4dd4d7405b",
+              "name": "prevPendingSlotId",
+              "value": "={{ $('PrepareTurn').first().json.pendingSlotId || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "3e8a4b92-d8b0-5f70-98ac-8777037deecc",
+              "name": "booked",
+              "value": "={{ !!$json.bookingRef }}",
+              "type": "boolean"
+            },
+            {
+              "id": "039a9b59-7729-5eeb-920a-1a3492d78310",
+              "name": "bookingRef",
+              "value": "={{ $json.bookingRef || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "268ac13d-ba7a-5eb2-8cf4-5948fa06f9d6",
+              "name": "confirmationCode",
+              "value": "={{ $json.confirmationCode || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
       },
-      "id": "f79085d8-a993-5e90-91a0-165ac14cb438",
-      "name": "ApplyGuards",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "id": "3429232b-ef1b-5e5a-b8fc-3459412f8cb6",
+      "name": "ReadOutput",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
-        1056,
-        672
+        208,
+        1616
       ]
     },
     {
       "parameters": {
-        "jsCode": "// The agent threw (model down, parser gave up). Deterministic apology and a PLATFORM_ERROR handoff; no model involved.\nconst prep = $('PrepareTurn').first().json;\nconst err = $json.error || {};\nconst lines = { pl: 'Przepraszam, mam problem techniczny. Połączę Państwa z konsultantem.', es: 'Disculpe, tengo un problema técnico. Le paso con un agente.', de: 'Entschuldigung, ich habe ein technisches Problem. Ich verbinde Sie mit einem Mitarbeiter.', en: 'Sorry, I have a technical problem. I will connect you to a colleague.' };\nreturn [{ json: { sessionId: prep.sessionId, correlationId: prep.correlationId, caseId: prep.caseId, language: prep.language, speak: lines[prep.language] || lines.en, action: 'handoff', state: 'HANDOFF', intent: 'UNKNOWN', handoffReason: 'PLATFORM_ERROR',\n  summary: 'Dialogue agent failed: ' + String(err.message || err.description || 'unknown').slice(0, 200), confidence: null, guards: ['agent_error'], needsHandoff: true, turn: prep.turn, startedAt: prep.startedAt, bookingRef: '', confirmationCode: '', pendingSlotId: '', errorCode: 'agent_error' } }];"
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1f38c79-605c-5168-b890-ee3618569a09",
+              "name": "speak",
+              "value": "={{ String($json.out.speak || '').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "dfdf22c3-734f-5c34-aa1c-538f62f6f47c",
+              "name": "action",
+              "value": "={{ ['continue','handoff','end'].includes($json.out.action) ? $json.out.action : 'continue' }}",
+              "type": "string"
+            },
+            {
+              "id": "f178eef3-7bc0-5bc4-9e26-e78585b2c865",
+              "name": "state",
+              "value": "={{ [\"IDENTIFY\", \"CONSENT\", \"NEED\", \"DEALER\", \"SLOT\", \"CONFIRM\", \"BOOKED\", \"WRAPUP\", \"HANDOFF\"].includes($json.out.state) ? $json.out.state : $json.prepState }}",
+              "type": "string"
+            },
+            {
+              "id": "9813313f-0368-510a-a425-80499c31b28b",
+              "name": "intent",
+              "value": "={{ [\"BOOK\", \"RESCHEDULE\", \"CANCEL\", \"OTHER\", \"UNKNOWN\"].includes($json.out.intent) ? $json.out.intent : 'UNKNOWN' }}",
+              "type": "string"
+            },
+            {
+              "id": "661e8d64-fe61-56d4-b8a6-2f3d5007f11b",
+              "name": "handoffReason",
+              "value": "={{ [\"CALLER_REQUEST\", \"SCENARIO_REQUIRES_AGENT\", \"NOT_UNDERSTOOD\", \"BACKEND_UNAVAILABLE\", \"IDENTIFICATION_FAILED\", \"NO_SLOT\", \"POLICY\", \"PLATFORM_ERROR\"].includes($json.out.handoffReason) ? $json.out.handoffReason : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "e8f30bd3-99c4-5054-bf0f-176da7561677",
+              "name": "summary",
+              "value": "={{ String($json.out.summary || '').slice(0, 500) }}",
+              "type": "string"
+            },
+            {
+              "id": "68a5acc4-45fa-5b7a-a709-b09d42499e22",
+              "name": "slotId",
+              "value": "={{ $json.out.slotId ? String($json.out.slotId) : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "e91dfc20-22a4-5995-a3b8-514c095ac508",
+              "name": "guards",
+              "value": "={{ [] }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
       },
-      "id": "d009d306-83bd-53bc-bbc5-230486c72f59",
-      "name": "HandleAgentError",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "id": "1da28052-c982-5a96-86b5-3ae084cf9b8a",
+      "name": "ClampOutput",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
-        848,
-        944
+        416,
+        1616
       ]
     },
     {
@@ -602,7 +761,1174 @@
           },
           "conditions": [
             {
-              "id": "42c052f6-a880-5660-8bb3-141e7fa07642",
+              "id": "bdff0f61-6bfd-5e52-a7f7-285fd1e84be4",
+              "leftValue": "={{ $json.gateDecline }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "ae3390a2-764d-5ca7-bbf0-d646c0909a9f",
+              "leftValue": "={{ $json.booked }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "2fabec75-c8e4-5582-a750-39eb52f0a2a5",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "handoff",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "64f156b9-ce9f-52ce-bcec-02cd98d7ff09",
+      "name": "GateDecline",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        624,
+        1616
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7a8b2317-cca4-5c67-a2e0-25e98fce5df3",
+              "name": "action",
+              "value": "handoff",
+              "type": "string"
+            },
+            {
+              "id": "d71189f8-27fa-5b59-84af-cc1eb9d8e4bf",
+              "name": "handoffReason",
+              "value": "={{ $json.gateDecline }}",
+              "type": "string"
+            },
+            {
+              "id": "8ecfb141-f071-58f4-8cc5-1a03074a26c4",
+              "name": "guards",
+              "value": "={{ $json.guards.concat(['gate_decline']) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "6eb93498-6d55-5944-a793-7230945b2da6",
+      "name": "OnGateDecline",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        624,
+        1888
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "37380978-5aae-5e3c-b2d4-bc44c9ed92ae",
+              "leftValue": "={{ $json.gateAdvanced }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "ef95580e-b78d-5cb7-8617-fa3866e38ec7",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "continue",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "88d9ae67-9112-50fd-96b3-a4fed07476b5",
+              "leftValue": "={{ [\"IDENTIFY\", \"CONSENT\", \"NEED\", \"DEALER\", \"SLOT\", \"CONFIRM\", \"BOOKED\", \"WRAPUP\", \"HANDOFF\"].indexOf($json.state) < [\"IDENTIFY\", \"CONSENT\", \"NEED\", \"DEALER\", \"SLOT\", \"CONFIRM\", \"BOOKED\", \"WRAPUP\", \"HANDOFF\"].indexOf($json.prepState) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ed391414-02dd-52a4-bb84-2a8098329985",
+      "name": "GateAdvance",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        832,
+        1616
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7fbfb196-5f7e-59d8-a85b-fdb3bc51866d",
+              "name": "state",
+              "value": "={{ $json.prepState }}",
+              "type": "string"
+            },
+            {
+              "id": "67690f4d-7c29-5a49-ac8a-896bde785cb5",
+              "name": "guards",
+              "value": "={{ $json.guards.concat(['gate_advance']) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "f1a28e72-efaa-527a-9b0c-2d706b04b588",
+      "name": "OnGateAdvance",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        832,
+        1888
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ece1f9b6-5727-5d83-8233-ded712a2eda0",
+              "leftValue": "={{ $json.gateAdvanced }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "e972fcca-3ea1-5dc9-b73e-08108d89df7e",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "handoff",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "70c542b4-9f38-5efb-b24d-8e0c75c674ed",
+              "leftValue": "={{ $json.handoffReason }}",
+              "rightValue": "SCENARIO_REQUIRES_AGENT",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "61480be1-0fa3-54f1-b6cc-f8dba4d9ada8",
+      "name": "ScenarioDowngrade",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1040,
+        1616
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0e0c2336-a1a3-5eef-a37d-9af246926677",
+              "name": "action",
+              "value": "continue",
+              "type": "string"
+            },
+            {
+              "id": "5f2cea32-2e07-55ed-8348-022af161ec4e",
+              "name": "state",
+              "value": "={{ $json.prepState }}",
+              "type": "string"
+            },
+            {
+              "id": "853f7a6f-6ac8-5b23-b3f8-0b6865455ce2",
+              "name": "handoffReason",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "2eebc4ff-2699-5f9a-ba2b-2502336a93c3",
+              "name": "speak",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "ac344b47-b313-5aa7-80cb-d3c920ef097b",
+              "name": "guards",
+              "value": "={{ $json.guards.concat(['scenario_downgrade']) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "3c7d6067-9062-5856-8dce-b1a37979959a",
+      "name": "OnScenarioDowngrade",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1040,
+        1888
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1e38e0b7-7c29-53f7-943f-13db61b04114",
+              "leftValue": "={{ $json.chatInput }}",
+              "rightValue": "(\\b(agent|human|person|operator|someone real|real person)\\b|konsultant|cz[łl]owiek|pracownik|doradc|persona|humano|agente|operador|mitarbeiter|mensch|berater|echte person)",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            },
+            {
+              "id": "81773864-490f-5b9b-8eec-4b7361e21e00",
+              "leftValue": "={{ $json.chatInput }}",
+              "rightValue": "\\b(no|nie|nein|not|kein)\\b[^.]{0,12}(agent|human|person|konsultant|persona|mitarbeiter)",
+              "operator": {
+                "type": "string",
+                "operation": "notRegex"
+              }
+            },
+            {
+              "id": "987194ea-4214-5325-810e-9bc705eee2f8",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "handoff",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            },
+            {
+              "id": "f606814a-d2dc-519b-aa59-586d23940d48",
+              "leftValue": "={{ $json.booked }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8d8d7428-2314-538a-844b-8a221aef6a6b",
+      "name": "CallerAsksForHuman",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        2288
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ff9d8cbd-b098-5286-935c-a57a36f10f47",
+              "name": "action",
+              "value": "handoff",
+              "type": "string"
+            },
+            {
+              "id": "598b66e0-575c-5c7e-8070-78baa7bc36dc",
+              "name": "handoffReason",
+              "value": "CALLER_REQUEST",
+              "type": "string"
+            },
+            {
+              "id": "0c815e07-1631-55bc-8510-e84b3134b9d3",
+              "name": "guards",
+              "value": "={{ $json.guards.concat(['caller_request_rule']) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "e057d7fd-16f6-5ad6-b9f7-257b401ad1b4",
+      "name": "OnCallerRequest",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        2560
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "998dbad4-2ee7-586d-856e-ab01964dd66d",
+              "name": "pendingSlotId",
+              "value": "={{ ($json.state === 'CONFIRM' && $json.slotId && $json.offeredSlotIds.includes($json.slotId)) ? $json.slotId : (($json.state !== 'CONFIRM' && !$json.booked) ? '' : $json.prevPendingSlotId) }}",
+              "type": "string"
+            },
+            {
+              "id": "696ea7a4-30a6-5bfe-9ff3-57eb203bcb08",
+              "name": "guards",
+              "value": "={{ ($json.state === 'CONFIRM' && $json.slotId && $json.offeredSlotIds.includes($json.slotId)) ? $json.guards.concat(['pending_slot_set']) : $json.guards }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "5e0e8509-3a8a-518b-aacd-616b644fd738",
+      "name": "PendingSlot",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        2288
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d3d07c0a-5d9f-5a90-8b04-84d2df1fa377",
+              "leftValue": "={{ $json.speak.toLowerCase() }}",
+              "rightValue": "((is|has been|was|are|'s) (now |all )?(booked|confirmed|reserved|scheduled)|confirmation code|zosta[łl][ao]? (zarezerwowan|potwierdzon|umówion)|kod potwierdzenia|(ha sido|está|queda) (reservad|confirmad)|código de confirmación|(ist|wurde) (gebucht|bestätigt|reserviert)|bestätigungscode)",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            },
+            {
+              "id": "6b069f07-86ee-5df2-ace2-cae2cbd0d74b",
+              "leftValue": "={{ $json.booked }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4b503773-d2b9-5442-826e-ed685f077913",
+      "name": "FalseConfirmation",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        416,
+        2288
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "955b2b7e-7d8f-5a89-946c-b4f0766b67a0",
+              "name": "speak",
+              "value": "={{ ({\"pl\": \"Jeszcze nie zarezerwowałem terminu. Czy mam go teraz zarezerwować?\", \"es\": \"Todavía no he reservado la cita. ¿Quiere que la reserve ahora?\", \"de\": \"Ich habe den Termin noch nicht gebucht. Soll ich ihn jetzt buchen?\", \"en\": \"I have not booked the appointment yet. Shall I book it now?\"})[$json.language] || \"I have not booked the appointment yet. Shall I book it now?\" }}",
+              "type": "string"
+            },
+            {
+              "id": "d4d08043-06f0-5ca2-ba0d-e3da82f0684b",
+              "name": "state",
+              "value": "={{ ['BOOKED','WRAPUP'].includes($json.state) ? 'CONFIRM' : $json.state }}",
+              "type": "string"
+            },
+            {
+              "id": "3a043d5b-a08a-5b07-9fd2-39e5e88b04ba",
+              "name": "action",
+              "value": "={{ $json.action === 'end' ? 'continue' : $json.action }}",
+              "type": "string"
+            },
+            {
+              "id": "d6475533-558f-5a97-8c8f-32106f8083c2",
+              "name": "guards",
+              "value": "={{ $json.guards.concat(['false_confirmation']) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "fe353705-9631-553e-a5ab-8e1a2f1f2c3e",
+      "name": "OnFalseConfirmation",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        2560
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0f16c229-394b-5574-9a19-10cd62d8308d",
+              "leftValue": "={{ $json.booked }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "eb7c86ff-fbe4-598f-bb8e-3aa3ec2c3289",
+              "leftValue": "={{ ['BOOKED','WRAPUP','HANDOFF'].includes($json.state) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "401614ec-d330-5949-8bf9-4e722df5fbd9",
+      "name": "ForceBooked",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        624,
+        2288
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8e1afa50-18a6-53af-b6ef-ed1a1194cda4",
+              "name": "state",
+              "value": "BOOKED",
+              "type": "string"
+            },
+            {
+              "id": "26cc3b26-940f-53fa-90dd-e540b82cccfb",
+              "name": "guards",
+              "value": "={{ $json.guards.concat(['state_forced_booked']) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "0315d4b3-e8b1-5d2d-afb2-ca733cdc033a",
+      "name": "OnForceBooked",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        624,
+        2560
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8314f1f9-a913-581e-8182-954cba10c043",
+              "leftValue": "={{ $json.speak }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "fe983350-b020-5a5e-80d9-718ba0237859",
+      "name": "EmptyReply",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        2944
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7b99f363-57ec-50f0-9f1f-4649e89113d2",
+              "name": "speak",
+              "value": "={{ ({\"pl\": \"Przepraszam, czy mogą Państwo powtórzyć?\", \"es\": \"Disculpe, ¿puede repetirlo?\", \"de\": \"Entschuldigung, können Sie das wiederholen?\", \"en\": \"Sorry, could you repeat that?\"})[$json.language] || \"Sorry, could you repeat that?\" }}",
+              "type": "string"
+            },
+            {
+              "id": "46bf9eb7-96d8-512a-8f39-11175313618b",
+              "name": "guards",
+              "value": "={{ $json.guards.concat(['empty_reply']) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "cf24fab8-a0c4-56c0-b3f5-1f02badcd2b9",
+      "name": "OnEmptyReply",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        3216
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f88dd7d9-6f1b-5598-aaea-0c5020ff2ab5",
+              "leftValue": "={{ $json.speak.length }}",
+              "rightValue": 400,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1fc9ebe3-9ad6-5aea-9bfe-e2763936b6a1",
+      "name": "ReplyTooLong",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        208,
+        2944
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "86d0e29b-3d0c-5b15-9b51-c11ef5528157",
+              "name": "speak",
+              "value": "={{ $json.speak.slice(0, 397) + '...' }}",
+              "type": "string"
+            },
+            {
+              "id": "a6b614e7-f03d-507f-9963-5e8ba2849fb8",
+              "name": "guards",
+              "value": "={{ $json.guards.concat(['reply_truncated']) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "4a006085-60c0-58c3-8b7f-fd7ef0d9b2ab",
+      "name": "OnReplyTooLong",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        3216
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "22273ed5-4c71-5b19-b68a-b3569f7203da",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "handoff",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "bb208424-dba0-5243-81fa-597ae34fb7aa",
+      "name": "HandoffNormalise",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        416,
+        2944
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "13ddbf70-f83c-5e32-88fa-bf80471becb0",
+              "name": "state",
+              "value": "HANDOFF",
+              "type": "string"
+            },
+            {
+              "id": "d1c04425-1dc8-5cf9-ad51-046283093b9a",
+              "name": "handoffReason",
+              "value": "={{ $json.handoffReason || 'CALLER_REQUEST' }}",
+              "type": "string"
+            },
+            {
+              "id": "529a2020-a6d0-5e10-9064-b8fc83c014c7",
+              "name": "speak",
+              "value": "={{ $json.handoverLine || $json.speak }}",
+              "type": "string"
+            },
+            {
+              "id": "1c50c178-9e27-543b-b5f3-0109eace1350",
+              "name": "guards",
+              "value": "={{ $json.guards.concat($json.handoffReason ? [] : ['reason_defaulted']).concat($json.handoverLine ? ['handover_line'] : []) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "91199dbd-a026-59c4-9ac5-6db805454be8",
+      "name": "OnHandoff",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        3216
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "133ab5a6-c391-5993-908d-c6fd8e524a13",
+              "leftValue": "={{ $json.state }}",
+              "rightValue": "HANDOFF",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "e3a55913-a1a6-5060-8b1a-f5145508aa67",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "handoff",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2da94019-9046-5dd1-9a72-33615dbd4b24",
+      "name": "ForceHandoff",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        624,
+        2944
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a38f6c8a-f667-5f3d-b47a-33550562c50b",
+              "name": "action",
+              "value": "handoff",
+              "type": "string"
+            },
+            {
+              "id": "75170e20-0762-5184-8bf1-248118abc65e",
+              "name": "handoffReason",
+              "value": "={{ $json.handoffReason || 'SCENARIO_REQUIRES_AGENT' }}",
+              "type": "string"
+            },
+            {
+              "id": "f28fb4d4-ecad-5013-a1cb-a7bf4b6fc4d8",
+              "name": "speak",
+              "value": "={{ $json.handoverLine || $json.speak }}",
+              "type": "string"
+            },
+            {
+              "id": "ae0fe165-6cc9-5fa9-8fc4-bad595d2ca61",
+              "name": "guards",
+              "value": "={{ $json.guards.concat(['action_forced_handoff']) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "650012d1-a58b-5a3f-8454-9714fcd46e41",
+      "name": "OnForceHandoff",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        624,
+        3216
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c539d925-59c2-5465-8814-dee1df321a83",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "end",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "0dea31ad-604a-59ea-b8c9-0f8347e0c30c",
+              "leftValue": "={{ ['BOOKED','WRAPUP'].includes($json.state) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3f5beb3d-65f0-56a3-aebf-afb60dd9c8cb",
+      "name": "EndBlocked",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        832,
+        2944
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "040e8836-9275-54a1-b952-ac1baac22252",
+              "name": "action",
+              "value": "continue",
+              "type": "string"
+            },
+            {
+              "id": "a61c523a-ee94-5298-93ca-4c0c9ea76246",
+              "name": "guards",
+              "value": "={{ $json.guards.concat(['end_blocked']) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "5a75f2a5-fc0f-5bd8-b8ba-a7059e644208",
+      "name": "OnEndBlocked",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        832,
+        3216
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "403c99c5-d71a-500d-b30b-c04d51b5f210",
+              "name": "sessionId",
+              "value": "={{ $json.sessionId }}",
+              "type": "string"
+            },
+            {
+              "id": "d7fa4d58-a534-5bfe-b624-fafd6876d97c",
+              "name": "correlationId",
+              "value": "={{ $json.correlationId }}",
+              "type": "string"
+            },
+            {
+              "id": "d7d0fd61-c754-5cc4-82e3-e06b726dcfd4",
+              "name": "caseId",
+              "value": "={{ $json.caseId }}",
+              "type": "string"
+            },
+            {
+              "id": "8212bb0f-af12-5ffb-99ab-8d7713ab0ce7",
+              "name": "language",
+              "value": "={{ $json.language }}",
+              "type": "string"
+            },
+            {
+              "id": "cfdd1287-19e3-5a9a-8224-bc31a6d96966",
+              "name": "speak",
+              "value": "={{ $json.speak }}",
+              "type": "string"
+            },
+            {
+              "id": "332b036b-f872-5845-9aa5-70e1c30d574d",
+              "name": "action",
+              "value": "={{ $json.action }}",
+              "type": "string"
+            },
+            {
+              "id": "733ccc92-c6e9-5313-be35-97c66cfb45a3",
+              "name": "state",
+              "value": "={{ $json.action === 'end' ? 'WRAPUP' : $json.state }}",
+              "type": "string"
+            },
+            {
+              "id": "4c28424e-c077-5203-ae6f-edc87ed5b75d",
+              "name": "intent",
+              "value": "={{ $json.intent }}",
+              "type": "string"
+            },
+            {
+              "id": "f09dd6e6-7dde-56c9-a9f3-7846ea9e8061",
+              "name": "handoffReason",
+              "value": "={{ $json.handoffReason }}",
+              "type": "string"
+            },
+            {
+              "id": "75dcc047-1cb2-5ab5-8501-9771d4be62bc",
+              "name": "summary",
+              "value": "={{ $json.summary }}",
+              "type": "string"
+            },
+            {
+              "id": "7ab3b03d-9a03-590e-81e7-a452918b3ee0",
+              "name": "guards",
+              "value": "={{ $json.guards }}",
+              "type": "array"
+            },
+            {
+              "id": "bd4f8ed9-a455-5118-8952-70eb5a47bfc2",
+              "name": "needsHandoff",
+              "value": "={{ $json.action === 'handoff' }}",
+              "type": "boolean"
+            },
+            {
+              "id": "0d55b793-b156-5e57-bd0d-11358897f2a2",
+              "name": "turn",
+              "value": "={{ $json.turn }}",
+              "type": "number"
+            },
+            {
+              "id": "c54843af-5054-5864-85a7-f430ee2b1f31",
+              "name": "startedAt",
+              "value": "={{ $json.startedAt }}",
+              "type": "number"
+            },
+            {
+              "id": "6fe0c10d-409a-5d63-a75c-e87d8aacb61a",
+              "name": "bookingRef",
+              "value": "={{ $json.bookingRef }}",
+              "type": "string"
+            },
+            {
+              "id": "6afe8490-e40d-56cc-ad82-f359d1e72a8e",
+              "name": "confirmationCode",
+              "value": "={{ $json.confirmationCode }}",
+              "type": "string"
+            },
+            {
+              "id": "945087cd-56f2-5641-9937-a6fe10d89e5d",
+              "name": "pendingSlotId",
+              "value": "={{ $json.pendingSlotId }}",
+              "type": "string"
+            },
+            {
+              "id": "407bd055-13ba-5f1f-83f5-d15ae2f9b403",
+              "name": "errorCode",
+              "value": "={{ $json.guards.join(',') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "90e1398d-b0c3-5b40-9dcf-7b37c7092edd",
+      "name": "GuardResult",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1040,
+        2944
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cf9c5444-86e3-52c8-b99a-2323b1f81dc2",
+              "name": "sessionId",
+              "value": "={{ $('PrepareTurn').first().json.sessionId }}",
+              "type": "string"
+            },
+            {
+              "id": "97adb861-5709-5610-982e-e49051b02551",
+              "name": "correlationId",
+              "value": "={{ $('PrepareTurn').first().json.correlationId }}",
+              "type": "string"
+            },
+            {
+              "id": "0ef6f182-9801-562c-83a5-6a25c30fa81c",
+              "name": "caseId",
+              "value": "={{ $('PrepareTurn').first().json.caseId || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "84e4bddb-5fff-5cfc-9f94-22a53477ed49",
+              "name": "language",
+              "value": "={{ $('PrepareTurn').first().json.language }}",
+              "type": "string"
+            },
+            {
+              "id": "15384691-ea29-5e55-b4b6-3be4402090fe",
+              "name": "speak",
+              "value": "={{ ({\"pl\": \"Przepraszam, mam problem techniczny. Połączę Państwa z konsultantem.\", \"es\": \"Disculpe, tengo un problema técnico. Le paso con un agente.\", \"de\": \"Entschuldigung, ich habe ein technisches Problem. Ich verbinde Sie mit einem Mitarbeiter.\", \"en\": \"Sorry, I have a technical problem. I will connect you to a colleague.\"})[$('PrepareTurn').first().json.language] || \"Sorry, I have a technical problem. I will connect you to a colleague.\" }}",
+              "type": "string"
+            },
+            {
+              "id": "d5f71dc8-945b-5d73-9fe8-ac9c7d99d6f4",
+              "name": "action",
+              "value": "handoff",
+              "type": "string"
+            },
+            {
+              "id": "f0268a57-d6e2-517e-ad0b-efc239ef3836",
+              "name": "state",
+              "value": "HANDOFF",
+              "type": "string"
+            },
+            {
+              "id": "76253289-deff-57fc-a0e1-167820cc2d3e",
+              "name": "intent",
+              "value": "UNKNOWN",
+              "type": "string"
+            },
+            {
+              "id": "7162d08b-dbc7-5890-a2ea-60efa6126a1d",
+              "name": "handoffReason",
+              "value": "PLATFORM_ERROR",
+              "type": "string"
+            },
+            {
+              "id": "d03781f9-3de5-58ec-9edc-802ad3d3847a",
+              "name": "summary",
+              "value": "={{ 'Dialogue agent failed: ' + String(($json.error || {}).message || ($json.error || {}).description || 'unknown').slice(0, 200) }}",
+              "type": "string"
+            },
+            {
+              "id": "df20bc1d-005c-5c06-a3ce-bf19dafd0a2f",
+              "name": "guards",
+              "value": "={{ ['agent_error'] }}",
+              "type": "array"
+            },
+            {
+              "id": "ce6c8185-5714-5729-be7b-c7e733db97b7",
+              "name": "needsHandoff",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "25767156-ec2e-58cc-88b3-b3db789679a4",
+              "name": "turn",
+              "value": "={{ $('PrepareTurn').first().json.turn }}",
+              "type": "number"
+            },
+            {
+              "id": "551e9235-7124-5858-84c3-56d3de2adc0b",
+              "name": "startedAt",
+              "value": "={{ $('PrepareTurn').first().json.startedAt }}",
+              "type": "number"
+            },
+            {
+              "id": "0dc90966-8e0a-5da4-9a7d-eb7a0ca8c4db",
+              "name": "bookingRef",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "f056f89c-fbc6-5c51-ac8e-8d45ec0e878c",
+              "name": "confirmationCode",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "c7905d93-464f-5e3b-9b54-b1413f2d0395",
+              "name": "pendingSlotId",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "a5bca006-208c-5b65-9e9c-3509ea45aa75",
+              "name": "errorCode",
+              "value": "agent_error",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d009d306-83bd-53bc-bbc5-230486c72f59",
+      "name": "HandleAgentError",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        3888
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "68bd69a1-7058-51a7-9449-5a1f05b6baaf",
               "leftValue": "={{ $json.needsHandoff }}",
               "rightValue": "",
               "operator": {
@@ -621,8 +1947,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1264,
-        672
+        0,
+        3616
       ]
     },
     {
@@ -697,21 +2023,53 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        1472,
-        672
+        208,
+        3616
       ]
     },
     {
       "parameters": {
-        "jsCode": "// Final response for session/turn (section 4.2 of the spec).\nlet g = null;\ntry { g = $('ApplyGuards').first().json; } catch (e) { g = null; }\nif (!g || !g.sessionId) { try { g = $('HandleAgentError').first().json; } catch (e) { g = null; } }\nif (!g) throw new Error('no guard output available');\nlet handoff = null;\nif (g.needsHandoff) {\n  try {\n    const h = $('BuildHandoff').first().json;\n    handoff = h.ok ? { intent: g.intent, handoffReason: g.handoffReason, caseId: g.caseId, uuiPayload: h.uuiPayload, uuiHex: h.uuiHex, uuiAscii: h.uuiAscii, referTo: h.referTo, truncated: h.truncated, summary: g.summary }\n                   : { intent: g.intent, handoffReason: g.handoffReason, caseId: g.caseId, error: h.error || 'handoff_build_failed' };\n  } catch (e) { handoff = { intent: g.intent, handoffReason: g.handoffReason, caseId: g.caseId, error: 'handoff_build_failed' }; }\n}\nconst latencyMs = Date.now() - Number(g.startedAt);\nconst response = { sessionId: g.sessionId, correlationId: g.correlationId, speak: g.speak, action: g.action, state: g.state, intent: g.intent, handoff, endReason: g.action === 'end' ? 'completed' : null, latencyMs, turn: g.turn, guards: g.guards };\nreturn [{ json: { ...g, response, latencyMs } }];"
+        "mode": "raw",
+        "jsonOutput": "={{ Object.assign({}, $('NeedsHandoff').first().json, { handoff: $json.ok ? { intent: $('NeedsHandoff').first().json.intent, handoffReason: $('NeedsHandoff').first().json.handoffReason, caseId: $('NeedsHandoff').first().json.caseId, uuiPayload: $json.uuiPayload, uuiHex: $json.uuiHex, uuiAscii: $json.uuiAscii, referTo: $json.referTo, truncated: $json.truncated, summary: $('NeedsHandoff').first().json.summary } : { intent: $('NeedsHandoff').first().json.intent, handoffReason: $('NeedsHandoff').first().json.handoffReason, caseId: $('NeedsHandoff').first().json.caseId, error: $json.error || 'handoff_build_failed' } }) }}",
+        "options": {}
+      },
+      "id": "0f41fb4d-6f6e-585b-b8b5-b7c4dddafe70",
+      "name": "AttachHandoff",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        3616
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "312abb1b-04c8-5bc2-ac83-b70e7c316010",
+              "name": "response",
+              "value": "={{ { sessionId: $json.sessionId, correlationId: $json.correlationId, speak: $json.speak, action: $json.action, state: $json.state, intent: $json.intent, handoff: $json.handoff || null, endReason: $json.action === 'end' ? 'completed' : null, latencyMs: Date.now() - Number($json.startedAt), turn: $json.turn, guards: $json.guards } }}",
+              "type": "object"
+            },
+            {
+              "id": "28148ef0-43d8-5b05-b719-1d35184f4546",
+              "name": "latencyMs",
+              "value": "={{ Date.now() - Number($json.startedAt) }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
       },
       "id": "764ab239-fc87-53dc-8543-b94c81637244",
       "name": "ComposeResponse",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
-        0,
-        1600
+        672,
+        3616
       ]
     },
     {
@@ -1023,8 +2381,8 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        208,
-        1600
+        880,
+        3616
       ],
       "alwaysOutputData": true
     },
@@ -1177,8 +2535,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        416,
-        1600
+        1088,
+        3616
       ]
     },
     {
@@ -1194,8 +2552,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        624,
-        1600
+        1296,
+        3616
       ]
     },
     {
@@ -1248,9 +2606,9 @@
     },
     {
       "parameters": {
-        "content": "## Guard\n\nCode decides: no booking claim without a code, caller-request rule, gate advance, handover line. Handoff builds the Refer-To here.",
-        "width": 864,
-        "height": 896,
+        "content": "## Guards 1: gates\n\nThe model's output is clamped to the allowed values, then each rule is an If (the condition) and an Edit Fields (what it changes). Gates: a deterministic yes or no in IDENTIFY and CONSENT wins over the model.",
+        "width": 1280,
+        "height": 624,
         "color": 5
       },
       "id": "zone-04",
@@ -1258,16 +2616,16 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        784,
-        528
+        -64,
+        1472
       ]
     },
     {
       "parameters": {
-        "content": "## Respond\n\nSession update, event row, the reply the gateway speaks.",
+        "content": "## Guards 2: caller and booking\n\nCaller asks for a person: handoff. A booking claim without a confirmation code is replaced by a question. A booking made by a tool forces BOOKED.",
         "width": 864,
-        "height": 336,
-        "color": 4
+        "height": 624,
+        "color": 5
       },
       "id": "zone-05",
       "name": "zone-05",
@@ -1275,7 +2633,55 @@
       "typeVersion": 1,
       "position": [
         -64,
-        1472
+        2144
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Guards 3: reply and end\n\nEmpty or over-long replies are fixed. A handoff always speaks the market's handover line. No end before BOOKED or WRAPUP.",
+        "width": 1280,
+        "height": 608,
+        "color": 5
+      },
+      "id": "zone-06",
+      "name": "zone-06",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        2816
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Handoff\n\nA model failure answers with a fixed apology and PLATFORM_ERROR. Any handoff builds the Refer-To through AR-14.",
+        "width": 656,
+        "height": 624,
+        "color": 3
+      },
+      "id": "zone-07",
+      "name": "zone-07",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        3472
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Respond\n\nSession update, event row, the reply the gateway speaks.",
+        "width": 864,
+        "height": 624,
+        "color": 4
+      },
+      "id": "zone-08",
+      "name": "zone-08",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        608,
+        3472
       ]
     },
     {
@@ -1384,6 +2790,369 @@
           {
             "node": "TurnOutputShape",
             "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReloadSession": {
+      "main": [
+        [
+          {
+            "node": "ReadOutput",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReadOutput": {
+      "main": [
+        [
+          {
+            "node": "ClampOutput",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ClampOutput": {
+      "main": [
+        [
+          {
+            "node": "GateDecline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GateDecline": {
+      "main": [
+        [
+          {
+            "node": "OnGateDecline",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GateAdvance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnGateDecline": {
+      "main": [
+        [
+          {
+            "node": "GateAdvance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GateAdvance": {
+      "main": [
+        [
+          {
+            "node": "OnGateAdvance",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ScenarioDowngrade",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnGateAdvance": {
+      "main": [
+        [
+          {
+            "node": "ScenarioDowngrade",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ScenarioDowngrade": {
+      "main": [
+        [
+          {
+            "node": "OnScenarioDowngrade",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "CallerAsksForHuman",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnScenarioDowngrade": {
+      "main": [
+        [
+          {
+            "node": "CallerAsksForHuman",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CallerAsksForHuman": {
+      "main": [
+        [
+          {
+            "node": "OnCallerRequest",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PendingSlot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnCallerRequest": {
+      "main": [
+        [
+          {
+            "node": "PendingSlot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PendingSlot": {
+      "main": [
+        [
+          {
+            "node": "FalseConfirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FalseConfirmation": {
+      "main": [
+        [
+          {
+            "node": "OnFalseConfirmation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ForceBooked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnFalseConfirmation": {
+      "main": [
+        [
+          {
+            "node": "ForceBooked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ForceBooked": {
+      "main": [
+        [
+          {
+            "node": "OnForceBooked",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "EmptyReply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnForceBooked": {
+      "main": [
+        [
+          {
+            "node": "EmptyReply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EmptyReply": {
+      "main": [
+        [
+          {
+            "node": "OnEmptyReply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ReplyTooLong",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnEmptyReply": {
+      "main": [
+        [
+          {
+            "node": "ReplyTooLong",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReplyTooLong": {
+      "main": [
+        [
+          {
+            "node": "OnReplyTooLong",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HandoffNormalise",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnReplyTooLong": {
+      "main": [
+        [
+          {
+            "node": "HandoffNormalise",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HandoffNormalise": {
+      "main": [
+        [
+          {
+            "node": "OnHandoff",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ForceHandoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnHandoff": {
+      "main": [
+        [
+          {
+            "node": "ForceHandoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ForceHandoff": {
+      "main": [
+        [
+          {
+            "node": "OnForceHandoff",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "EndBlocked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnForceHandoff": {
+      "main": [
+        [
+          {
+            "node": "EndBlocked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EndBlocked": {
+      "main": [
+        [
+          {
+            "node": "OnEndBlocked",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GuardResult",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnEndBlocked": {
+      "main": [
+        [
+          {
+            "node": "GuardResult",
+            "type": "main",
             "index": 0
           }
         ]
@@ -1498,18 +3267,18 @@
         ]
       ]
     },
-    "ReloadSession": {
+    "GuardResult": {
       "main": [
         [
           {
-            "node": "ApplyGuards",
+            "node": "NeedsHandoff",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "ApplyGuards": {
+    "HandleAgentError": {
       "main": [
         [
           {
@@ -1538,18 +3307,18 @@
         ]
       ]
     },
-    "HandleAgentError": {
+    "BuildHandoff": {
       "main": [
         [
           {
-            "node": "BuildHandoff",
+            "node": "AttachHandoff",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "BuildHandoff": {
+    "AttachHandoff": {
       "main": [
         [
           {

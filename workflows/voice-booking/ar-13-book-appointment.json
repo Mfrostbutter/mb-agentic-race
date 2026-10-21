@@ -71,12 +71,103 @@
     },
     {
       "parameters": {
-        "jsCode": "// The only place a booking can start. slotId must be one the session offered in this call.\nconst inp = $('ToolInput').first().json;\nconst s = $json;\nlet offered = []; try { offered = JSON.parse(s.offeredSlots || '[]'); } catch (e) { offered = []; }\nconst wanted = String(inp.slotId || '').trim();\nconst slot = offered.find(o => o.slotId === wanted);\nif (s.bookingRef) return [{ json: { proceed: false, ok: true, already: true, confirmationCode: s.confirmationCode, bookingRef: s.bookingRef, message: 'An appointment is already booked in this call. Read the existing confirmation code back; do not book again.' } }];\nif (!slot) return [{ json: { proceed: false, ok: false, error: 'slot_not_offered', message: 'slotId is not one of the slots offered in this call. Call FindSlots and use one of its slotIds.', offeredSlotIds: offered.map(o => o.slotId) } }];\nif (s.state !== 'CONFIRM' || s.slotId !== wanted) return [{ json: { proceed: false, ok: false, error: 'not_confirmed', message: 'The caller has not confirmed this slot yet. Read back dealer, day and time with this slotId in the slotId field (state CONFIRM), and call BookAppointment only in the next turn after the caller says yes.', pendingSlotId: s.slotId || null } }];\nreturn [{ json: { proceed: true, slot, sessionId: s.sessionId, correlationId: s.correlationId, vehicleRef: s.vehicleRef, serviceType: inp.serviceType || '', mobility: inp.mobility || '', notes: String(inp.notes || '').slice(0, 200), idempotencyKey: s.sessionId + ':' + slot.slotId } }];"
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "75c98da6-fca8-5039-9d75-7b71997d73f8",
+                    "leftValue": "={{ $json.bookingRef || '' }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEmpty",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "AlreadyBooked"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "8be0f62b-4927-58d6-8c4c-9eb5c9d71f61",
+                    "leftValue": "={{ JSON.parse($json.offeredSlots || '[]').some(o => o.slotId === String($('ToolInput').first().json.slotId || '').trim()) }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "false",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "SlotNotOffered"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "21be9cf5-4d2a-5757-9a08-5240fa401165",
+                    "leftValue": "={{ $json.state || '' }}",
+                    "rightValue": "CONFIRM",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEquals"
+                    }
+                  },
+                  {
+                    "id": "d9d77bef-8a19-572a-b33b-fe841a19d422",
+                    "leftValue": "={{ $json.slotId || '' }}",
+                    "rightValue": "={{ String($('ToolInput').first().json.slotId || '').trim() }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEquals"
+                    }
+                  }
+                ],
+                "combinator": "or"
+              },
+              "renameOutput": true,
+              "outputKey": "NotConfirmed"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Proceed"
+        }
       },
-      "id": "95a4dc62-963e-565b-8ebf-66532d5bb412",
-      "name": "ValidateSlot",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "id": "eb99759c-062e-5d13-8bcd-b35eeac3f704",
+      "name": "BookingGate",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
       "position": [
         416,
         0
@@ -84,33 +175,193 @@
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 2
-          },
-          "conditions": [
+        "assignments": {
+          "assignments": [
             {
-              "id": "ad1b5922-e1e5-5363-bf8f-a0c155a097fa",
-              "leftValue": "={{ $json.proceed }}",
-              "rightValue": "",
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
+              "id": "ffee5f97-b293-520c-a155-8261ac6fd174",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "933cdbfb-a0a3-590d-a297-5afcfafdcef8",
+              "name": "already",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "9e88fd18-b838-58be-9489-a272bfd6afdb",
+              "name": "confirmationCode",
+              "value": "={{ $json.confirmationCode || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "014608ad-15ae-5e03-9c09-70ff651d7558",
+              "name": "bookingRef",
+              "value": "={{ $json.bookingRef }}",
+              "type": "string"
+            },
+            {
+              "id": "5e8f3cd4-cfa6-5827-8806-07f6b6fde88c",
+              "name": "message",
+              "value": "An appointment is already booked in this call. Read the existing confirmation code back; do not book again.",
+              "type": "string"
             }
-          ],
-          "combinator": "and"
+          ]
         },
         "options": {}
       },
-      "id": "466e9230-9c2f-510e-99d0-52f70ac074a8",
-      "name": "CanProceed",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
+      "id": "61e1e9bd-9ac8-508d-8683-6292893bb7bc",
+      "name": "ReplyAlreadyBooked",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        624,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "334ae9ae-f129-544c-aa34-60104b21f874",
+              "name": "ok",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "c7e33f1f-bf46-5f28-ba53-eb396650b3f0",
+              "name": "error",
+              "value": "slot_not_offered",
+              "type": "string"
+            },
+            {
+              "id": "1a33e837-c59c-56a2-90f6-b9a4e0b59ddb",
+              "name": "message",
+              "value": "slotId is not one of the slots offered in this call. Call FindSlots and use one of its slotIds.",
+              "type": "string"
+            },
+            {
+              "id": "3b8b6421-957e-5116-90ed-a5078e8f08d2",
+              "name": "offeredSlotIds",
+              "value": "={{ JSON.parse($json.offeredSlots || '[]').map(o => o.slotId) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "af4e7d77-a2b3-58b7-b1c8-00756bec91a6",
+      "name": "ReplySlotNotOffered",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        624,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "db8f0f84-dac2-52a4-90b8-bec59ff65d34",
+              "name": "ok",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "4d65b5b6-a0b8-5dc1-9a23-c610e5b6809b",
+              "name": "error",
+              "value": "not_confirmed",
+              "type": "string"
+            },
+            {
+              "id": "73819bc9-39c1-5c63-b82d-42f2936edc63",
+              "name": "message",
+              "value": "The caller has not confirmed this slot yet. Read back dealer, day and time with this slotId in the slotId field (state CONFIRM), and call BookAppointment only in the next turn after the caller says yes.",
+              "type": "string"
+            },
+            {
+              "id": "72e3172c-0c00-5ec7-8d1a-7ef83e775dc4",
+              "name": "pendingSlotId",
+              "value": "={{ $json.slotId || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fd3853c6-b10a-5c34-a36b-e1e7528736d6",
+      "name": "ReplyNotConfirmed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        624,
+        816
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9b81dc93-6ab9-5f4b-b925-f21a158ff04f",
+              "name": "slot",
+              "value": "={{ JSON.parse($json.offeredSlots || '[]').find(o => o.slotId === String($('ToolInput').first().json.slotId || '').trim()) }}",
+              "type": "object"
+            },
+            {
+              "id": "7d9e30cf-8bd8-588f-b804-11d0f605ea30",
+              "name": "sessionId",
+              "value": "={{ $json.sessionId }}",
+              "type": "string"
+            },
+            {
+              "id": "c6301b6d-933e-5695-8dfe-8f8a1b398354",
+              "name": "correlationId",
+              "value": "={{ $json.correlationId }}",
+              "type": "string"
+            },
+            {
+              "id": "01ddaf04-0bdf-5ab1-8e1e-b6cf5062e36d",
+              "name": "vehicleRef",
+              "value": "={{ $json.vehicleRef || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "9079944f-4064-5d29-bb1c-6b14c59781de",
+              "name": "serviceType",
+              "value": "={{ $('ToolInput').first().json.serviceType || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "19cb3db6-1585-5de8-ac5d-0238e662162f",
+              "name": "mobility",
+              "value": "={{ $('ToolInput').first().json.mobility || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "af5f63c7-a0c6-5467-bc53-4c389325e5e0",
+              "name": "notes",
+              "value": "={{ String($('ToolInput').first().json.notes || '').slice(0, 200) }}",
+              "type": "string"
+            },
+            {
+              "id": "3f483f47-8b3d-5f96-855b-24b6db353273",
+              "name": "idempotencyKey",
+              "value": "={{ $json.sessionId + ':' + String($('ToolInput').first().json.slotId || '').trim() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "52ecb7c0-cdbb-5321-a6a1-f7fddeb63a60",
+      "name": "BookingRequest",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
         624,
         0
@@ -154,7 +405,7 @@
             {
               "keyName": "sessionId",
               "condition": "eq",
-              "keyValue": "={{ $('ValidateSlot').first().json.sessionId }}"
+              "keyValue": "={{ $('BookingRequest').first().json.sessionId }}"
             }
           ]
         },
@@ -457,12 +708,64 @@
     },
     {
       "parameters": {
-        "jsCode": "const b = $('CallDealerBookBook').first().json; const v = $('ValidateSlot').first().json;\nreturn [{ json: { ok: true, confirmationCode: b.confirmationCode, bookingRef: b.bookingRef, when: v.slot.label, dealerName: v.slot.dealerName, serviceType: v.serviceType, mobility: v.mobility, note: 'Booked. Read the confirmation code back to the caller slowly and tell them a confirmation message will follow.' } }];"
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9a047f35-04f1-5df7-bedd-6c63c18fa1a5",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "0e821acc-b2d2-56e3-92cc-5510891d4ad2",
+              "name": "confirmationCode",
+              "value": "={{ $('CallDealerBookBook').first().json.confirmationCode }}",
+              "type": "string"
+            },
+            {
+              "id": "44626a2b-e756-5a78-bf7a-19305ceeb5fd",
+              "name": "bookingRef",
+              "value": "={{ $('CallDealerBookBook').first().json.bookingRef }}",
+              "type": "string"
+            },
+            {
+              "id": "112bc543-7715-5ebc-959b-f473c47af332",
+              "name": "when",
+              "value": "={{ $('BookingRequest').first().json.slot.label }}",
+              "type": "string"
+            },
+            {
+              "id": "6b7fc344-5269-5678-8b37-c37890bb6d82",
+              "name": "dealerName",
+              "value": "={{ $('BookingRequest').first().json.slot.dealerName || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "4cbbed64-f455-521a-ba1f-5fb5f2271bc5",
+              "name": "serviceType",
+              "value": "={{ $('BookingRequest').first().json.serviceType }}",
+              "type": "string"
+            },
+            {
+              "id": "405eb12b-e3c8-54a4-93a2-e42aa4c542bd",
+              "name": "mobility",
+              "value": "={{ $('BookingRequest').first().json.mobility }}",
+              "type": "string"
+            },
+            {
+              "id": "5654a424-600d-5107-b304-abe00a05d043",
+              "name": "note",
+              "value": "Booked. Read the confirmation code back to the caller slowly and tell them a confirmation message will follow.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "30d9feb9-aae8-58ce-9d66-2bd4f31f2fa9",
       "name": "ReturnBooking",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
         1296,
         0
@@ -470,12 +773,40 @@
     },
     {
       "parameters": {
-        "jsCode": "// Shapes a failed HTTP call into the sub-workflow's error contract. No throw: the caller branches on ok.\nconst e = $json.error || {};\nconst text = JSON.stringify(e);\nconst conflict = /409/.test(text);\nreturn [{ json: { ok: false, error: conflict ? 'slot_taken' : 'backend_unavailable',\n  message: conflict ? 'That slot was taken in the meantime. Call FindSlots again and offer new options.' : 'The backend system is unavailable. Apologise once and hand the caller to an agent (BACKEND_UNAVAILABLE).',\n  detail: String(e.message || '').slice(0, 200) } }];"
+        "assignments": {
+          "assignments": [
+            {
+              "id": "81e7e2ed-cdcd-5a4c-bed3-085380c0e7a8",
+              "name": "ok",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "7433d698-0ad5-5342-b4c7-f83eb595d997",
+              "name": "error",
+              "value": "={{ JSON.stringify($json.error || {}).includes('409') ? 'slot_taken' : 'backend_unavailable' }}",
+              "type": "string"
+            },
+            {
+              "id": "30194167-8125-5b80-9872-8311c12da15c",
+              "name": "message",
+              "value": "={{ JSON.stringify($json.error || {}).includes('409') ? 'That slot was taken in the meantime. Call FindSlots again and offer new options.' : 'The backend system is unavailable. Apologise once and hand the caller to an agent (BACKEND_UNAVAILABLE).' }}",
+              "type": "string"
+            },
+            {
+              "id": "4ea7e7e7-9026-5e1d-bc72-d5259c2dd278",
+              "name": "detail",
+              "value": "={{ String(($json.error || {}).message || '').slice(0, 200) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "8eeff2be-ae15-5648-84ab-18644b2c7935",
       "name": "ReturnBookError",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
         880,
         272
@@ -483,22 +814,9 @@
     },
     {
       "parameters": {
-        "jsCode": "const j = { ...$json }; delete j.proceed; return [{ json: j }];"
-      },
-      "id": "50c58155-5927-5d09-9346-fc54dbfecb4f",
-      "name": "ReturnValidation",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        624,
-        272
-      ]
-    },
-    {
-      "parameters": {
-        "content": "## Validate\n\nThe slot must be one offered in this call, read back in CONFIRM, and confirmed in a later turn.",
+        "content": "## Booking gate\n\nRules in order: a booking already exists; the slot was not offered in this call; the caller has not confirmed it (state CONFIRM with this slotId read back). Only Proceed books.",
         "width": 864,
-        "height": 624,
+        "height": 1200,
         "color": 5
       },
       "id": "zone-01",
@@ -507,14 +825,14 @@
       "typeVersion": 1,
       "position": [
         -64,
-        -144
+        -176
       ]
     },
     {
       "parameters": {
         "content": "## Book\n\nIdempotency key session:slot. The confirmation code comes from DealerBook, never from the model.",
         "width": 656,
-        "height": 624,
+        "height": 1200,
         "color": 3
       },
       "id": "zone-02",
@@ -523,12 +841,12 @@
       "typeVersion": 1,
       "position": [
         816,
-        -144
+        -176
       ]
     },
     {
       "parameters": {
-        "content": "## AR-13 BookAppointment\n\nValidates the slotId against the session, books with an idempotency key, writes bookingRef and confirmationCode to the session, sets state BOOKED. The spoken confirmation is built from this result, never from the model.",
+        "content": "## AR-13 BookAppointment\n\nBookingGate is the only place a booking can start: the slot must be one offered in this call, read back in CONFIRM, and confirmed in a later turn. Books with an idempotency key, writes bookingRef and confirmationCode to the session, sets state BOOKED. The spoken confirmation is built from this result, never from the model.",
         "width": 816,
         "height": 256,
         "color": 6
@@ -539,7 +857,7 @@
       "typeVersion": 1,
       "position": [
         -64,
-        -416
+        -448
       ]
     }
   ],
@@ -559,36 +877,50 @@
       "main": [
         [
           {
-            "node": "ValidateSlot",
+            "node": "BookingGate",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "ValidateSlot": {
+    "BookingGate": {
       "main": [
         [
           {
-            "node": "CanProceed",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "CanProceed": {
-      "main": [
-        [
-          {
-            "node": "CallDealerBookBook",
+            "node": "ReplyAlreadyBooked",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "ReturnValidation",
+            "node": "ReplySlotNotOffered",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ReplyNotConfirmed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "BookingRequest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BookingRequest": {
+      "main": [
+        [
+          {
+            "node": "CallDealerBookBook",
             "type": "main",
             "index": 0
           }

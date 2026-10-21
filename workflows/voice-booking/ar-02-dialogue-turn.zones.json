@@ -40,14 +40,61 @@
       ]
     },
     {
-      "title": "Guard",
-      "body": "Code decides: no booking claim without a code, caller-request rule, gate advance, handover line. Handoff builds the Refer-To here.",
+      "title": "Guards 1: gates",
+      "body": "The model's output is clamped to the allowed values, then each rule is an If (the condition) and an Edit Fields (what it changes). Gates: a deterministic yes or no in IDENTIFY and CONSENT wins over the model.",
       "color": 5,
       "nodes": [
         "ReloadSession",
-        "ApplyGuards",
+        "ReadOutput",
+        "ClampOutput",
+        "GateDecline",
+        "GateAdvance",
+        "ScenarioDowngrade",
+        "OnGateDecline",
+        "OnGateAdvance",
+        "OnScenarioDowngrade"
+      ]
+    },
+    {
+      "title": "Guards 2: caller and booking",
+      "body": "Caller asks for a person: handoff. A booking claim without a confirmation code is replaced by a question. A booking made by a tool forces BOOKED.",
+      "color": 5,
+      "nodes": [
+        "CallerAsksForHuman",
+        "PendingSlot",
+        "FalseConfirmation",
+        "ForceBooked",
+        "OnCallerRequest",
+        "OnFalseConfirmation",
+        "OnForceBooked"
+      ]
+    },
+    {
+      "title": "Guards 3: reply and end",
+      "body": "Empty or over-long replies are fixed. A handoff always speaks the market's handover line. No end before BOOKED or WRAPUP.",
+      "color": 5,
+      "nodes": [
+        "EmptyReply",
+        "ReplyTooLong",
+        "HandoffNormalise",
+        "ForceHandoff",
+        "EndBlocked",
+        "GuardResult",
+        "OnEmptyReply",
+        "OnReplyTooLong",
+        "OnHandoff",
+        "OnForceHandoff",
+        "OnEndBlocked"
+      ]
+    },
+    {
+      "title": "Handoff",
+      "body": "A model failure answers with a fixed apology and PLATFORM_ERROR. Any handoff builds the Refer-To through AR-14.",
+      "color": 3,
+      "nodes": [
         "NeedsHandoff",
         "BuildHandoff",
+        "AttachHandoff",
         "HandleAgentError"
       ]
     },

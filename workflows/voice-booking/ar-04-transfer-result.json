@@ -67,7 +67,7 @@
           },
           "conditions": [
             {
-              "id": "a0cdeac7-a3fb-508d-b56c-003a4dd53375",
+              "id": "654af446-0f40-5515-965e-1ec0457cf26c",
               "leftValue": "={{ $json.sessionId }}",
               "rightValue": "",
               "operator": {

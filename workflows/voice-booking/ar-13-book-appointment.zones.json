@@ -2,15 +2,17 @@
   "gutter": 16,
   "zones": [
     {
-      "title": "Validate",
-      "body": "The slot must be one offered in this call, read back in CONFIRM, and confirmed in a later turn.",
+      "title": "Booking gate",
+      "body": "Rules in order: a booking already exists; the slot was not offered in this call; the caller has not confirmed it (state CONFIRM with this slotId read back). Only Proceed books.",
       "color": 5,
       "nodes": [
         "ToolInput",
         "LoadSession",
-        "ValidateSlot",
-        "CanProceed",
-        "ReturnValidation"
+        "BookingGate",
+        "BookingRequest",
+        "ReplyAlreadyBooked",
+        "ReplySlotNotOffered",
+        "ReplyNotConfirmed"
       ]
     },
     {
@@ -28,7 +30,7 @@
   "panels": [
     {
       "title": "AR-13 BookAppointment",
-      "body": "Validates the slotId against the session, books with an idempotency key, writes bookingRef and confirmationCode to the session, sets state BOOKED. The spoken confirmation is built from this result, never from the model.",
+      "body": "BookingGate is the only place a booking can start: the slot must be one offered in this call, read back in CONFIRM, and confirmed in a later turn. Books with an idempotency key, writes bookingRef and confirmationCode to the session, sets state BOOKED. The spoken confirmation is built from this result, never from the model.",
       "color": 6,
       "width": 816
     }

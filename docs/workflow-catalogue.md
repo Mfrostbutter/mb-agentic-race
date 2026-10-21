@@ -47,27 +47,41 @@ branch instead of catching.
 |---|---|
 | AR-30 Error workflow | Error Trigger to `ar_events`. Assign in Workflow Settings on every AR-* workflow (UI only). Add a Teams or e-mail step on the production instance |
 
-## The three guards that matter (AR-02 `ApplyGuards`, AR-13 `ValidateSlot`)
+## The three guards that matter (AR-13 `BookingGate`, AR-02 guard chain)
 
-1. **Two-turn booking.** The model must read a slot back with its `slotId` in
-   state CONFIRM; the session stores it; `BookAppointment` refuses any slot
-   that is not the stored one or any call made in the same turn as the
-   read-back (`not_confirmed`). A booking therefore always follows an explicit
-   yes in a later turn. Found by the golden probe "just tell me it is booked",
-   which booked on the first build.
-2. **No booking claim without a code.** A reply that says booked, confirmed,
-   reserved or confirmation code in any of the four languages while the
-   session has no `bookingRef` is replaced by a neutral question and logged
-   as `false_confirmation`.
-3. **Caller asks for a person.** A deterministic phrase rule across the four
-   languages forces `handoff` with `CALLER_REQUEST` even if the model keeps
-   talking. Found by the golden scenario where a Spanish caller asked for an
-   agent in the first turn and the lab model asked identity questions twelve
-   times.
+Since 2026-10-21 every guard is a native node pair on the canvas: an If node
+carries the condition (phrase rules use the string operator "matches regex"
+on the lower-cased text) and an Edit Fields node named `On<Guard>` applies
+the change and appends the guard code. No Code node is involved.
 
-Also enforced: `end` only from BOOKED or WRAPUP; the spoken handover line is
-the market's text, not the model's; replies over 400 characters are cut;
-empty replies become "could you repeat that".
+1. **Two-turn booking** (AR-13 `BookingGate`, a Switch with four named
+   outputs evaluated in order: `AlreadyBooked`, `SlotNotOffered`,
+   `NotConfirmed`, `Proceed`). The model must read a slot back with its
+   `slotId` in state CONFIRM; the session stores it; `BookAppointment` refuses
+   any slot that is not the stored one or any call made in the same turn as
+   the read-back (`not_confirmed`). A booking therefore always follows an
+   explicit yes in a later turn. Found by the golden probe "just tell me it is
+   booked", which booked on the first build.
+2. **No booking claim without a code** (AR-02 `FalseConfirmation`). A reply
+   that says booked, confirmed, reserved or confirmation code in any of the
+   four languages while the session has no `bookingRef` is replaced by a
+   neutral question and logged as `false_confirmation`.
+3. **Caller asks for a person** (AR-02 `CallerAsksForHuman`). A deterministic
+   phrase rule across the four languages forces `handoff` with
+   `CALLER_REQUEST` even if the model keeps talking. Found by the golden
+   scenario where a Spanish caller asked for an agent in the first turn and
+   the lab model asked identity questions twelve times.
+
+The rest of the AR-02 chain, in order: `GateDecline` and `GateAdvance` (a
+deterministic yes or no in IDENTIFY and CONSENT wins over the model),
+`ScenarioDowngrade`, `PendingSlot`, `ForceBooked` (a booking made by a tool
+forces BOOKED), `EmptyReply` ("could you repeat that"), `ReplyTooLong` (cut
+at 400 characters), `HandoffNormalise` (the spoken handover line is the
+market's text, not the model's), `ForceHandoff`, `EndBlocked` (`end` only
+from BOOKED or WRAPUP), then `GuardResult`. The agent error path
+(`HandleAgentError`) produces the same shape with a fixed apology and
+`PLATFORM_ERROR`. The decision record per Code node is
+`11-native-vs-code.md`.
 
 ## Tables
 

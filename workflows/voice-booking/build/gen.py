@@ -126,22 +126,75 @@ class WF:
     def code(self, name, js, x, y, **extra):
         return self.add(name, "n8n-nodes-base.code", 2, {"jsCode": js}, x, y, **extra)
 
-    def set_fields(self, name, fields, x, y):
+    def set_fields(self, name, fields, x, y, keep=False):
+        """Edit Fields, manual mapping. fields: (name, value, type). keep=True passes the other input fields through."""
         assigns = [{"id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"ar/{self.key}/{name}/{f}")), "name": f, "value": v, "type": t}
                    for f, v, t in fields]
-        return self.add(name, "n8n-nodes-base.set", 3.4, {"assignments": {"assignments": assigns}, "options": {}}, x, y)
+        p = {"assignments": {"assignments": assigns}, "options": {}}
+        if keep:
+            p["includeOtherFields"] = True
+        return self.add(name, "n8n-nodes-base.set", 3.4, p, x, y)
+
+    def set_json(self, name, expr, x, y):
+        """Edit Fields in JSON mode: the expression's object becomes the whole item."""
+        return self.add(name, "n8n-nodes-base.set", 3.4, {"mode": "raw", "jsonOutput": expr, "options": {}}, x, y)
+
+    # ---- conditions ----------------------------------------------------------
+    SINGLE_OPS = {"true", "false", "empty", "notEmpty", "exists", "notExists"}
+
+    @classmethod
+    def cond(cls, left, op, right="", kind="string"):
+        """One filter condition. kind string|boolean|number; op per n8n's filter operators (equals, notEquals,
+        regex, notRegex, empty, notEmpty, true, false, gt, lt, ...). For regex: lower-case the left side and pass a bare pattern."""
+        operator = {"type": kind, "operation": op}
+        if op in cls.SINGLE_OPS:
+            operator["singleValue"] = True
+        return {"leftValue": left, "rightValue": right, "operator": operator}
+
+    def _rule(self, name, conds, combinator="and", version=2):
+        out = []
+        for i, c in enumerate(conds):
+            out.append({"id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"ar/{self.key}/{name}/c{i}")), **c})
+        return {"options": {"caseSensitive": True, "leftValue": "", "typeValidation": "loose", "version": version},
+                "conditions": out, "combinator": combinator}
 
     def if_node(self, name, left, x, y, kind="boolean"):
-        if kind == "boolean":
-            op = {"type": "boolean", "operation": "true", "singleValue": True}
-            right = ""
-        else:
-            op = {"type": "string", "operation": "notEmpty", "singleValue": True}
-            right = ""
-        cond = {"options": {"caseSensitive": True, "leftValue": "", "typeValidation": "loose", "version": 2},
-                "conditions": [{"id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"ar/{self.key}/{name}/c")), "leftValue": left,
-                                "rightValue": right, "operator": op}], "combinator": "and"}
-        return self.add(name, "n8n-nodes-base.if", 2.2, {"conditions": cond, "options": {}}, x, y)
+        """Single-condition If: boolean true, or string not empty."""
+        c = self.cond(left, "true", kind="boolean") if kind == "boolean" else self.cond(left, "notEmpty")
+        return self.if_rules(name, [c], x, y)
+
+    def if_rules(self, name, conds, x, y, combinator="and"):
+        """If with several conditions (see cond). Output 0 true, 1 false."""
+        return self.add(name, "n8n-nodes-base.if", 2.2, {"conditions": self._rule(name, conds, combinator), "options": {}}, x, y)
+
+    def switch(self, name, rules, x, y, fallback=None):
+        """Switch in rules mode. rules: list of (outputName, conds, combinator); first match wins, in order.
+        fallback names the extra output for items no rule matched (index len(rules))."""
+        vals = [{"conditions": self._rule(f"{name}/{o}", c, comb, version=3), "renameOutput": True, "outputKey": o} for o, c, comb in rules]
+        opts = {"fallbackOutput": "extra", "renameFallbackOutput": fallback} if fallback else {}
+        return self.add(name, "n8n-nodes-base.switch", 3.4, {"rules": {"values": vals}, "looseTypeValidation": True, "options": opts}, x, y)
+
+    def guard_chain(self, srcs, guards):
+        """Named rule chain: for each (ifName, conds, combinator, setName, fields) an If and an Edit Fields that applies the rule.
+        Both outcomes continue to the next rule. srcs: [(node, output)] feeding the first If. Returns the sources for the next node."""
+        for ifn, conds, comb, setn, fields in guards:
+            i = self.if_rules(ifn, conds, 0, 0, comb)
+            for s, out in srcs:
+                self.link(s, i, out)
+            st = self.set_fields(setn, fields, 0, 0, keep=True)
+            self.link(i, st, 0)
+            srcs = [(st, 0), (i, 1)]
+        return srcs
+
+    def return_error(self, name, x, y):
+        """Shapes a failed HTTP call into the sub-workflow's error contract. No throw: the caller branches on ok."""
+        conflict = "JSON.stringify($json.error || {}).includes('409')"
+        return self.set_fields(name, [
+            ("ok", False, "boolean"),
+            ("error", f"={{{{ {conflict} ? 'slot_taken' : 'backend_unavailable' }}}}", "string"),
+            ("message", f"={{{{ {conflict} ? 'That slot was taken in the meantime. Call FindSlots again and offer new options.' : 'The backend system is unavailable. Apologise once and hand the caller to an agent (BACKEND_UNAVAILABLE).' }}}}", "string"),
+            ("detail", "={{ String(($json.error || {}).message || '').slice(0, 200) }}", "string"),
+        ], x, y)
 
     def dt(self, name, table, op, x, y, conditions=None, values=None, limit=1, always=True):
         p = {"operation": op, "dataTableId": {"__rl": True, "mode": "id", "value": IDS["dt_" + table]}}
@@ -255,13 +308,23 @@ def canvas_layout(path, zpath):
         raise SystemExit(f"canvas gate failed for {os.path.basename(path)}:\n{r.stdout[-1500:]}{r.stderr[-500:]}")
 
 
-RETURN_ERROR_JS = """// Shapes a failed HTTP call into the sub-workflow's error contract. No throw: the caller branches on ok.
-const e = $json.error || {};
-const text = JSON.stringify(e);
-const conflict = /409/.test(text);
-return [{ json: { ok: false, error: conflict ? 'slot_taken' : 'backend_unavailable',
-  message: conflict ? 'That slot was taken in the meantime. Call FindSlots again and offer new options.' : 'The backend system is unavailable. Apologise once and hand the caller to an agent (BACKEND_UNAVAILABLE).',
-  detail: String(e.message || '').slice(0, 200) } }];"""
+STATES = ["IDENTIFY", "CONSENT", "NEED", "DEALER", "SLOT", "CONFIRM", "BOOKED", "WRAPUP", "HANDOFF"]
+INTENTS = ["BOOK", "RESCHEDULE", "CANCEL", "OTHER", "UNKNOWN"]
+REASONS = ["CALLER_REQUEST", "SCENARIO_REQUIRES_AGENT", "NOT_UNDERSTOOD", "BACKEND_UNAVAILABLE", "IDENTIFICATION_FAILED", "NO_SLOT", "POLICY", "PLATFORM_ERROR"]
+STATES_JS, INTENTS_JS, REASONS_JS = (json.dumps(x) for x in (STATES, INTENTS, REASONS))
+
+
+def lang_pick(texts, lang_expr="$json.language"):
+    """Expression that picks a text by language, English fallback. Moves to ar_markets columns in step 2."""
+    return f"={{{{ ({json.dumps(texts, ensure_ascii=False)})[{lang_expr}] || {json.dumps(texts['en'], ensure_ascii=False)} }}}}"
+
+
+def with_guard(code, when=None):
+    """Expression appending a guard code to $json.guards, optionally only when a JS condition holds."""
+    if when:
+        return f"={{{{ ({when}) ? $json.guards.concat(['{code}']) : $json.guards }}}}"
+    return f"={{{{ $json.guards.concat(['{code}']) }}}}"
+
 
 # =============================================================================
 # AR-17 log event
@@ -431,7 +494,7 @@ def build_ar10():
     t = w.sub_trigger([("vin","string"),("msisdn","string"),("correlationId","string")])
     h = w.http_post("CallCrm", MOCK + "/crm/customer-lookup", "={{ JSON.stringify({ vin: $json.vin, msisdn: $json.msisdn, correlationId: $json.correlationId }) }}", 260, 0)
     s = w.code("ShapeCustomer", "const r = $json;\nreturn [{ json: { ok: true, known: !!r.found, customerRef: r.customerRef || '', vehicleRef: r.vin || '', greetingName: r.greetingName || '', vehicleLabel: r.vehicleLabel || '', preferredDealerId: r.preferredDealerId || '', preferredDealerName: r.preferredDealerName || '', market: r.market || '', language: r.language || '' } }];", 520, -80)
-    e = w.code("ReturnCrmError", RETURN_ERROR_JS, 520, 120)
+    e = w.return_error("ReturnCrmError", 520, 120)
     w.chain(t, h)
     w.link(h, s, 0)
     w.link(h, e, 1)
@@ -444,7 +507,7 @@ def build_ar11():
     g = w.dt("LoadSession", "ar_sessions", "get", 260, 0, conditions=[("sessionId", "={{ $json.sessionId }}")])
     h = w.http_post("CallDealerBookDealers", MOCK + "/dealerbook/dealers", "={{ JSON.stringify({ market: $json.market, city: $('ToolInput').first().json.city || '' }) }}", 520, 0)
     s = w.code("ShapeDealers", "const r = $json;\nconst dealers = (r.dealers || []).slice(0, 5);\nreturn [{ json: { ok: true, count: dealers.length, dealers, note: dealers.length ? 'Offer at most two by name. Dealers with bookable false cannot be booked here.' : 'No dealer matched. Ask for another city or offer the preferred dealer.' } }];", 780, -80)
-    e = w.code("ReturnDealersError", RETURN_ERROR_JS, 780, 120)
+    e = w.return_error("ReturnDealersError", 780, 120)
     w.chain(t, g, h)
     w.link(h, s, 0)
     w.link(h, e, 1)
@@ -473,40 +536,62 @@ def build_ar12():
     u = w.dt("StoreOffered", "ar_sessions", "update", 1040, -80, conditions=[("sessionId", "={{ $json.sessionId }}")],
              values={"offeredSlots": "={{ $json.offeredSlots }}", "dealerId": "={{ $json.dealerId }}", "dealerName": "={{ $json.dealerName }}"})
     rt = w.code("ReturnSlots", "return [{ json: $('ShapeSlots').first().json.result }];", 1300, -80)
-    e = w.code("ReturnSlotsError", RETURN_ERROR_JS, 780, 120)
+    e = w.return_error("ReturnSlotsError", 780, 120)
     w.chain(t, g, h)
     w.link(h, s, 0)
     w.link(h, e, 1)
     w.chain(s, u, rt)
     return w
 
-VALIDATE_SLOT_JS = """// The only place a booking can start. slotId must be one the session offered in this call.
-const inp = $('ToolInput').first().json;
-const s = $json;
-let offered = []; try { offered = JSON.parse(s.offeredSlots || '[]'); } catch (e) { offered = []; }
-const wanted = String(inp.slotId || '').trim();
-const slot = offered.find(o => o.slotId === wanted);
-if (s.bookingRef) return [{ json: { proceed: false, ok: true, already: true, confirmationCode: s.confirmationCode, bookingRef: s.bookingRef, message: 'An appointment is already booked in this call. Read the existing confirmation code back; do not book again.' } }];
-if (!slot) return [{ json: { proceed: false, ok: false, error: 'slot_not_offered', message: 'slotId is not one of the slots offered in this call. Call FindSlots and use one of its slotIds.', offeredSlotIds: offered.map(o => o.slotId) } }];
-if (s.state !== 'CONFIRM' || s.slotId !== wanted) return [{ json: { proceed: false, ok: false, error: 'not_confirmed', message: 'The caller has not confirmed this slot yet. Read back dealer, day and time with this slotId in the slotId field (state CONFIRM), and call BookAppointment only in the next turn after the caller says yes.', pendingSlotId: s.slotId || null } }];
-return [{ json: { proceed: true, slot, sessionId: s.sessionId, correlationId: s.correlationId, vehicleRef: s.vehicleRef, serviceType: inp.serviceType || '', mobility: inp.mobility || '', notes: String(inp.notes || '').slice(0, 200), idempotencyKey: s.sessionId + ':' + slot.slotId } }];"""
-
 def build_ar13():
     w = WF("ar-13-book-appointment", "AR-13 Tool: Book appointment", "Agent tool. Books one of the slots offered in this call in DealerBook and stores the confirmation on the session. Inputs: sessionId (plumbed), slotId, serviceType, mobility, notes. Returns {ok, confirmationCode, bookingRef, when, dealerName} or {ok:false, error}. Idempotent per session and slot.")
-    w.sticky("## AR-13 BookAppointment\nValidates the slotId against the session, books with an idempotency key, writes bookingRef and confirmationCode to the session, sets state BOOKED. The spoken confirmation is built from this result, never from the model.", 0, -400, 820, 110)
+    w.sticky("## AR-13 BookAppointment\nBookingGate is the only place a booking can start: the slot must be one offered in this call, read back in CONFIRM, and confirmed in a later turn. Books with an idempotency key, writes bookingRef and confirmationCode to the session, sets state BOOKED. The spoken confirmation is built from this result, never from the model.", 0, -400, 820, 110)
     t = w.sub_trigger([("sessionId","string"),("slotId","string"),("serviceType","string"),("mobility","string"),("notes","string")])
     g = w.dt("LoadSession", "ar_sessions", "get", 260, 0, conditions=[("sessionId", "={{ $json.sessionId }}")])
-    v = w.code("ValidateSlot", VALIDATE_SLOT_JS, 520, 0)
-    i = w.if_node("CanProceed", "={{ $json.proceed }}", 780, 0)
+    wanted = "String($('ToolInput').first().json.slotId || '').trim()"
+    offered = "JSON.parse($json.offeredSlots || '[]')"
+    gate = w.switch("BookingGate", [
+        ("AlreadyBooked", [w.cond("={{ $json.bookingRef || '' }}", "notEmpty")], "and"),
+        ("SlotNotOffered", [w.cond(f"={{{{ {offered}.some(o => o.slotId === {wanted}) }}}}", "false", kind="boolean")], "and"),
+        ("NotConfirmed", [w.cond("={{ $json.state || '' }}", "notEquals", "CONFIRM"),
+                          w.cond("={{ $json.slotId || '' }}", "notEquals", f"={{{{ {wanted} }}}}")], "or"),
+    ], 520, 0, fallback="Proceed")
+    r0 = w.set_fields("ReplyAlreadyBooked", [
+        ("ok", True, "boolean"), ("already", True, "boolean"),
+        ("confirmationCode", "={{ $json.confirmationCode || '' }}", "string"), ("bookingRef", "={{ $json.bookingRef }}", "string"),
+        ("message", "An appointment is already booked in this call. Read the existing confirmation code back; do not book again.", "string")], 780, 140)
+    r1 = w.set_fields("ReplySlotNotOffered", [
+        ("ok", False, "boolean"), ("error", "slot_not_offered", "string"),
+        ("message", "slotId is not one of the slots offered in this call. Call FindSlots and use one of its slotIds.", "string"),
+        ("offeredSlotIds", f"={{{{ {offered}.map(o => o.slotId) }}}}", "array")], 780, 280)
+    r2 = w.set_fields("ReplyNotConfirmed", [
+        ("ok", False, "boolean"), ("error", "not_confirmed", "string"),
+        ("message", "The caller has not confirmed this slot yet. Read back dealer, day and time with this slotId in the slotId field (state CONFIRM), and call BookAppointment only in the next turn after the caller says yes.", "string"),
+        ("pendingSlotId", "={{ $json.slotId || '' }}", "string")], 780, 420)
+    req = w.set_fields("BookingRequest", [
+        ("slot", f"={{{{ {offered}.find(o => o.slotId === {wanted}) }}}}", "object"),
+        ("sessionId", "={{ $json.sessionId }}", "string"), ("correlationId", "={{ $json.correlationId }}", "string"),
+        ("vehicleRef", "={{ $json.vehicleRef || '' }}", "string"),
+        ("serviceType", "={{ $('ToolInput').first().json.serviceType || '' }}", "string"),
+        ("mobility", "={{ $('ToolInput').first().json.mobility || '' }}", "string"),
+        ("notes", "={{ String($('ToolInput').first().json.notes || '').slice(0, 200) }}", "string"),
+        ("idempotencyKey", f"={{{{ $json.sessionId + ':' + {wanted} }}}}", "string")], 780, 0)
     h = w.http_post("CallDealerBookBook", MOCK + "/dealerbook/book", "={{ JSON.stringify({ slotId: $json.slot.slotId, dealerId: $json.slot.dealerId, vin: $json.vehicleRef, serviceType: $json.serviceType, mobility: $json.mobility, notes: $json.notes, idempotencyKey: $json.idempotencyKey, correlationId: $json.correlationId }) }}", 1040, -100)
-    u = w.dt("StoreBooking", "ar_sessions", "update", 1300, -180, conditions=[("sessionId", "={{ $('ValidateSlot').first().json.sessionId }}")],
+    u = w.dt("StoreBooking", "ar_sessions", "update", 1300, -180, conditions=[("sessionId", "={{ $('BookingRequest').first().json.sessionId }}")],
              values={"bookingRef": "={{ $json.bookingRef }}", "confirmationCode": "={{ $json.confirmationCode }}", "slotId": "={{ $json.slotId }}", "state": "BOOKED", "intent": "BOOK", "confirmationChannel": "sms"})
-    rb = w.code("ReturnBooking", "const b = $('CallDealerBookBook').first().json; const v = $('ValidateSlot').first().json;\nreturn [{ json: { ok: true, confirmationCode: b.confirmationCode, bookingRef: b.bookingRef, when: v.slot.label, dealerName: v.slot.dealerName, serviceType: v.serviceType, mobility: v.mobility, note: 'Booked. Read the confirmation code back to the caller slowly and tell them a confirmation message will follow.' } }];", 1560, -180)
-    e = w.code("ReturnBookError", RETURN_ERROR_JS, 1300, 0)
-    rv = w.code("ReturnValidation", "const j = { ...$json }; delete j.proceed; return [{ json: j }];", 1040, 140)
-    w.chain(t, g, v, i)
-    w.link(i, h, 0)
-    w.link(i, rv, 1)
+    rb = w.set_fields("ReturnBooking", [
+        ("ok", True, "boolean"),
+        ("confirmationCode", "={{ $('CallDealerBookBook').first().json.confirmationCode }}", "string"),
+        ("bookingRef", "={{ $('CallDealerBookBook').first().json.bookingRef }}", "string"),
+        ("when", "={{ $('BookingRequest').first().json.slot.label }}", "string"),
+        ("dealerName", "={{ $('BookingRequest').first().json.slot.dealerName || '' }}", "string"),
+        ("serviceType", "={{ $('BookingRequest').first().json.serviceType }}", "string"),
+        ("mobility", "={{ $('BookingRequest').first().json.mobility }}", "string"),
+        ("note", "Booked. Read the confirmation code back to the caller slowly and tell them a confirmation message will follow.", "string")], 1560, -180)
+    e = w.return_error("ReturnBookError", 1300, 0)
+    w.chain(t, g, gate)
+    w.link(gate, r0, 0); w.link(gate, r1, 1); w.link(gate, r2, 2); w.link(gate, req, 3)
+    w.link(req, h)
     w.link(h, u, 0)
     w.link(h, e, 1)
     w.link(u, rb)
@@ -554,7 +639,7 @@ def build_ar15():
     t = w.sub_trigger([("op","string"),("correlationId","string"),("caseId","string"),("subject","string"),("classification","string"),("status","string"),("solution","string"),("delegatedReason","string")])
     h = w.http_post("CallCaseSystem", MOCK + "/casesys/case", "={{ JSON.stringify($json) }}", 260, 0)
     s = w.code("ShapeCase", "const r = $json; return [{ json: { ok: true, caseId: r.caseId, status: r.status } }];", 520, -80)
-    e = w.code("ReturnCaseError", RETURN_ERROR_JS, 520, 120)
+    e = w.return_error("ReturnCaseError", 520, 120)
     w.chain(t, h)
     w.link(h, s, 0)
     w.link(h, e, 1)
@@ -566,7 +651,7 @@ def build_ar16():
     t = w.sub_trigger([("channel","string"),("customerRef","string"),("language","string"),("text","string"),("correlationId","string")])
     h = w.http_post("CallComms", MOCK + "/comms/send", "={{ JSON.stringify($json) }}", 260, 0)
     s = w.code("ShapeComms", "const r = $json; return [{ json: { ok: !!r.accepted, messageId: r.messageId || '', channel: r.channel || '' } }];", 520, -80)
-    e = w.code("ReturnCommsError", RETURN_ERROR_JS, 520, 120)
+    e = w.return_error("ReturnCommsError", 520, 120)
     w.chain(t, h)
     w.link(h, s, 0)
     w.link(h, e, 1)
@@ -734,74 +819,123 @@ Rules:
 - Return only json matching the schema. The speak field is read aloud to the caller.${lowConf ? '\n- The speech recogniser reported low confidence for this utterance; if it is unclear, ask the caller to repeat.' : ''}`;
 return [{ json: { sessionId: s.sessionId, correlationId: s.correlationId, caseId: s.caseId, market: s.market, language: lang, state, chatInput: req.transcript || '(silence)', systemPrompt, startedAt: req.startedAt, turn: (Number(s.turns) || 0) + 1, lowConf, handoverLine: m.handoverLine || '', offeredSlotIds: offered.map(o => o.slotId), pendingSlotId: s.slotId || '', gateAdvanced, gateDecline } }];"""
 
-APPLY_GUARDS_JS = r"""// Deterministic guards on the model's structured output. Runs after the session was re-read, so a booking made by a tool in this turn is visible.
-const prep = $('PrepareTurn').first().json;
-const agent = $('DialogueAgent').first().json;
-const s = $json;
-let out = agent.output;
-if (typeof out === 'string') { try { out = JSON.parse(out); } catch (e) { out = { speak: out }; } }
-out = out || {};
-const states = ['IDENTIFY','CONSENT','NEED','DEALER','SLOT','CONFIRM','BOOKED','WRAPUP','HANDOFF'];
-const intents = ['BOOK','RESCHEDULE','CANCEL','OTHER','UNKNOWN'];
-const reasons = ['CALLER_REQUEST','SCENARIO_REQUIRES_AGENT','NOT_UNDERSTOOD','BACKEND_UNAVAILABLE','IDENTIFICATION_FAILED','NO_SLOT','POLICY','PLATFORM_ERROR'];
-const L = prep.language;
-const t = (o) => o[L] || o.en;
-const guards = [];
-let speak = String(out.speak || '').trim();
-let action = ['continue','handoff','end'].includes(out.action) ? out.action : 'continue';
-let state = states.includes(out.state) ? out.state : prep.state;
-let intent = intents.includes(out.intent) ? out.intent : 'UNKNOWN';
-let handoffReason = reasons.includes(out.handoffReason) ? out.handoffReason : null;
-const booked = !!s.bookingRef;
-if (prep.gateDecline && !booked && action !== 'handoff') { action = 'handoff'; handoffReason = prep.gateDecline; guards.push('gate_decline'); }
-if (prep.gateAdvanced && action === 'continue' && states.indexOf(state) < states.indexOf(prep.state)) { state = prep.state; guards.push('gate_advance'); }
-if (prep.gateAdvanced && action === 'handoff' && handoffReason === 'SCENARIO_REQUIRES_AGENT') { action = 'continue'; state = prep.state; handoffReason = null; speak = ''; guards.push('scenario_downgrade'); }
-const asksForHuman = /(\b(agent|human|person|operator|someone real|real person)\b|konsultant|cz[łl]owiek|pracownik|doradc|persona|humano|agente|operador|mitarbeiter|mensch|berater|echte person)/i.test(prep.chatInput || '') && !/\b(no|nie|nein|not|kein)\b[^.]{0,12}(agent|human|person|konsultant|persona|mitarbeiter)/i.test(prep.chatInput || '');
-if (asksForHuman && action !== 'handoff' && !booked) { action = 'handoff'; handoffReason = 'CALLER_REQUEST'; guards.push('caller_request_rule'); }
-let pendingSlotId = prep.pendingSlotId || '';
-const offeredIds = prep.offeredSlotIds || [];
-if (state === 'CONFIRM' && out.slotId && offeredIds.includes(String(out.slotId))) { pendingSlotId = String(out.slotId); guards.push('pending_slot_set'); }
-if (state !== 'CONFIRM' && !booked) pendingSlotId = '';
-const claimsBooking = /((is|has been|was|are|'s) (now |all )?(booked|confirmed|reserved|scheduled)|confirmation code|zosta[łl][ao]? (zarezerwowan|potwierdzon|umówion)|kod potwierdzenia|(ha sido|está|queda) (reservad|confirmad)|código de confirmación|(ist|wurde) (gebucht|bestätigt|reserviert)|bestätigungscode)/i.test(speak);
-if (claimsBooking && !booked) {
-  guards.push('false_confirmation');
-  speak = t({ pl: 'Jeszcze nie zarezerwowałem terminu. Czy mam go teraz zarezerwować?', es: 'Todavía no he reservado la cita. ¿Quiere que la reserve ahora?', de: 'Ich habe den Termin noch nicht gebucht. Soll ich ihn jetzt buchen?', en: 'I have not booked the appointment yet. Shall I book it now?' });
-  if (state === 'BOOKED' || state === 'WRAPUP') state = 'CONFIRM';
-  if (action === 'end') action = 'continue';
-}
-if (booked && !['BOOKED','WRAPUP','HANDOFF'].includes(state)) { state = 'BOOKED'; guards.push('state_forced_booked'); }
-if (!speak) { guards.push('empty_reply'); speak = t({ pl: 'Przepraszam, czy mogą Państwo powtórzyć?', es: 'Disculpe, ¿puede repetirlo?', de: 'Entschuldigung, können Sie das wiederholen?', en: 'Sorry, could you repeat that?' }); }
-if (speak.length > 400) { guards.push('reply_truncated'); speak = speak.slice(0, 397) + '...'; }
-if (action === 'handoff') { state = 'HANDOFF'; if (!handoffReason) { handoffReason = 'CALLER_REQUEST'; guards.push('reason_defaulted'); } if (prep.handoverLine) { speak = prep.handoverLine; guards.push('handover_line'); } }
-if (state === 'HANDOFF' && action !== 'handoff') { action = 'handoff'; handoffReason = handoffReason || 'SCENARIO_REQUIRES_AGENT'; guards.push('action_forced_handoff'); if (prep.handoverLine) speak = prep.handoverLine; }
-if (action === 'end' && !['BOOKED','WRAPUP'].includes(state)) { guards.push('end_blocked'); action = 'continue'; }
-if (action === 'end') state = 'WRAPUP';
-return [{ json: { sessionId: prep.sessionId, correlationId: prep.correlationId, caseId: prep.caseId, language: L, speak, action, state, intent, handoffReason, summary: String(out.summary || '').slice(0, 500),
-  confidence: typeof out.confidence === 'number' ? out.confidence : null, guards, needsHandoff: action === 'handoff', turn: prep.turn, startedAt: prep.startedAt, bookingRef: s.bookingRef || '', confirmationCode: s.confirmationCode || '', pendingSlotId, errorCode: guards.length ? guards.join(',') : '' } }];"""
+# Phrase patterns for the guard rules. Matched against the lower-cased text with the If node's "matches regex" operator.
+ASKS_FOR_HUMAN = r"(\b(agent|human|person|operator|someone real|real person)\b|konsultant|cz[łl]owiek|pracownik|doradc|persona|humano|agente|operador|mitarbeiter|mensch|berater|echte person)"
+DECLINES_HUMAN = r"\b(no|nie|nein|not|kein)\b[^.]{0,12}(agent|human|person|konsultant|persona|mitarbeiter)"
+CLAIMS_BOOKING = r"((is|has been|was|are|'s) (now |all )?(booked|confirmed|reserved|scheduled)|confirmation code|zosta[łl][ao]? (zarezerwowan|potwierdzon|umówion)|kod potwierdzenia|(ha sido|está|queda) (reservad|confirmad)|código de confirmación|(ist|wurde) (gebucht|bestätigt|reserviert)|bestätigungscode)"
 
-AGENT_ERROR_JS = """// The agent threw (model down, parser gave up). Deterministic apology and a PLATFORM_ERROR handoff; no model involved.
-const prep = $('PrepareTurn').first().json;
-const err = $json.error || {};
-const lines = { pl: 'Przepraszam, mam problem techniczny. Połączę Państwa z konsultantem.', es: 'Disculpe, tengo un problema técnico. Le paso con un agente.', de: 'Entschuldigung, ich habe ein technisches Problem. Ich verbinde Sie mit einem Mitarbeiter.', en: 'Sorry, I have a technical problem. I will connect you to a colleague.' };
-return [{ json: { sessionId: prep.sessionId, correlationId: prep.correlationId, caseId: prep.caseId, language: prep.language, speak: lines[prep.language] || lines.en, action: 'handoff', state: 'HANDOFF', intent: 'UNKNOWN', handoffReason: 'PLATFORM_ERROR',
-  summary: 'Dialogue agent failed: ' + String(err.message || err.description || 'unknown').slice(0, 200), confidence: null, guards: ['agent_error'], needsHandoff: true, turn: prep.turn, startedAt: prep.startedAt, bookingRef: '', confirmationCode: '', pendingSlotId: '', errorCode: 'agent_error' } }];"""
+NOT_BOOKED_LINE = {"pl": "Jeszcze nie zarezerwowałem terminu. Czy mam go teraz zarezerwować?", "es": "Todavía no he reservado la cita. ¿Quiere que la reserve ahora?", "de": "Ich habe den Termin noch nicht gebucht. Soll ich ihn jetzt buchen?", "en": "I have not booked the appointment yet. Shall I book it now?"}
+REPEAT_LINE = {"pl": "Przepraszam, czy mogą Państwo powtórzyć?", "es": "Disculpe, ¿puede repetirlo?", "de": "Entschuldigung, können Sie das wiederholen?", "en": "Sorry, could you repeat that?"}
+TECH_ERROR_LINE = {"pl": "Przepraszam, mam problem techniczny. Połączę Państwa z konsultantem.", "es": "Disculpe, tengo un problema técnico. Le paso con un agente.", "de": "Entschuldigung, ich habe ein technisches Problem. Ich verbinde Sie mit einem Mitarbeiter.", "en": "Sorry, I have a technical problem. I will connect you to a colleague."}
 
-COMPOSE_RESPONSE_JS = """// Final response for session/turn (section 4.2 of the spec).
-let g = null;
-try { g = $('ApplyGuards').first().json; } catch (e) { g = null; }
-if (!g || !g.sessionId) { try { g = $('HandleAgentError').first().json; } catch (e) { g = null; } }
-if (!g) throw new Error('no guard output available');
-let handoff = null;
-if (g.needsHandoff) {
-  try {
-    const h = $('BuildHandoff').first().json;
-    handoff = h.ok ? { intent: g.intent, handoffReason: g.handoffReason, caseId: g.caseId, uuiPayload: h.uuiPayload, uuiHex: h.uuiHex, uuiAscii: h.uuiAscii, referTo: h.referTo, truncated: h.truncated, summary: g.summary }
-                   : { intent: g.intent, handoffReason: g.handoffReason, caseId: g.caseId, error: h.error || 'handoff_build_failed' };
-  } catch (e) { handoff = { intent: g.intent, handoffReason: g.handoffReason, caseId: g.caseId, error: 'handoff_build_failed' }; }
-}
-const latencyMs = Date.now() - Number(g.startedAt);
-const response = { sessionId: g.sessionId, correlationId: g.correlationId, speak: g.speak, action: g.action, state: g.state, intent: g.intent, handoff, endReason: g.action === 'end' ? 'completed' : null, latencyMs, turn: g.turn, guards: g.guards };
-return [{ json: { ...g, response, latencyMs } }];"""
+# Fields every guard-chain result carries into the response stage.
+GUARD_RESULT_FIELDS = ["sessionId", "correlationId", "caseId", "language", "speak", "action", "state", "intent", "handoffReason", "summary",
+                       "guards", "needsHandoff", "turn", "startedAt", "bookingRef", "confirmationCode", "pendingSlotId", "errorCode"]
+
+
+def add_guards(w, src):
+    """The deterministic guards on the model's structured output, as named If + Edit Fields pairs. Runs after the session
+    was re-read, so a booking made by a tool in this turn is visible. src: the ReloadSession node. Returns the result node."""
+    P = "$('PrepareTurn').first().json"
+    A = "$('DialogueAgent').first().json.output"
+    ro = w.set_fields("ReadOutput", [
+        ("out", f"={{{{ typeof {A} === 'string' ? {{ speak: {A} }} : ({A} || {{}}) }}}}", "object"),
+        ("sessionId", f"={{{{ {P}.sessionId }}}}", "string"), ("correlationId", f"={{{{ {P}.correlationId }}}}", "string"),
+        ("caseId", f"={{{{ {P}.caseId || '' }}}}", "string"), ("language", f"={{{{ {P}.language }}}}", "string"),
+        ("turn", f"={{{{ {P}.turn }}}}", "number"), ("startedAt", f"={{{{ {P}.startedAt }}}}", "number"),
+        ("prepState", f"={{{{ {P}.state }}}}", "string"), ("gateDecline", f"={{{{ {P}.gateDecline || '' }}}}", "string"),
+        ("gateAdvanced", f"={{{{ {P}.gateAdvanced === true }}}}", "boolean"), ("handoverLine", f"={{{{ {P}.handoverLine || '' }}}}", "string"),
+        ("chatInput", f"={{{{ String({P}.chatInput || '').toLowerCase() }}}}", "string"),
+        ("offeredSlotIds", f"={{{{ {P}.offeredSlotIds || [] }}}}", "array"), ("prevPendingSlotId", f"={{{{ {P}.pendingSlotId || '' }}}}", "string"),
+        ("booked", "={{ !!$json.bookingRef }}", "boolean"), ("bookingRef", "={{ $json.bookingRef || '' }}", "string"),
+        ("confirmationCode", "={{ $json.confirmationCode || '' }}", "string"),
+    ], 0, 0)
+    cl = w.set_fields("ClampOutput", [
+        ("speak", "={{ String($json.out.speak || '').trim() }}", "string"),
+        ("action", "={{ ['continue','handoff','end'].includes($json.out.action) ? $json.out.action : 'continue' }}", "string"),
+        ("state", f"={{{{ {STATES_JS}.includes($json.out.state) ? $json.out.state : $json.prepState }}}}", "string"),
+        ("intent", f"={{{{ {INTENTS_JS}.includes($json.out.intent) ? $json.out.intent : 'UNKNOWN' }}}}", "string"),
+        ("handoffReason", f"={{{{ {REASONS_JS}.includes($json.out.handoffReason) ? $json.out.handoffReason : '' }}}}", "string"),
+        ("summary", "={{ String($json.out.summary || '').slice(0, 500) }}", "string"),
+        ("slotId", "={{ $json.out.slotId ? String($json.out.slotId) : '' }}", "string"),
+        ("guards", "={{ [] }}", "array"),
+    ], 0, 0, keep=True)
+    w.chain(src, ro, cl)
+    booked_false = w.cond("={{ $json.booked }}", "false", kind="boolean")
+    srcs = w.guard_chain([(cl, 0)], [
+        ("GateDecline", [w.cond("={{ $json.gateDecline }}", "notEmpty"), booked_false, w.cond("={{ $json.action }}", "notEquals", "handoff")], "and",
+         "OnGateDecline", [("action", "handoff", "string"), ("handoffReason", "={{ $json.gateDecline }}", "string"), ("guards", with_guard("gate_decline"), "array")]),
+        ("GateAdvance", [w.cond("={{ $json.gateAdvanced }}", "true", kind="boolean"), w.cond("={{ $json.action }}", "equals", "continue"),
+                         w.cond(f"={{{{ {STATES_JS}.indexOf($json.state) < {STATES_JS}.indexOf($json.prepState) }}}}", "true", kind="boolean")], "and",
+         "OnGateAdvance", [("state", "={{ $json.prepState }}", "string"), ("guards", with_guard("gate_advance"), "array")]),
+        ("ScenarioDowngrade", [w.cond("={{ $json.gateAdvanced }}", "true", kind="boolean"), w.cond("={{ $json.action }}", "equals", "handoff"),
+                               w.cond("={{ $json.handoffReason }}", "equals", "SCENARIO_REQUIRES_AGENT")], "and",
+         "OnScenarioDowngrade", [("action", "continue", "string"), ("state", "={{ $json.prepState }}", "string"), ("handoffReason", "", "string"),
+                                 ("speak", "", "string"), ("guards", with_guard("scenario_downgrade"), "array")]),
+        ("CallerAsksForHuman", [w.cond("={{ $json.chatInput }}", "regex", ASKS_FOR_HUMAN), w.cond("={{ $json.chatInput }}", "notRegex", DECLINES_HUMAN),
+                                w.cond("={{ $json.action }}", "notEquals", "handoff"), booked_false], "and",
+         "OnCallerRequest", [("action", "handoff", "string"), ("handoffReason", "CALLER_REQUEST", "string"), ("guards", with_guard("caller_request_rule"), "array")]),
+    ])
+    slot_set = "$json.state === 'CONFIRM' && $json.slotId && $json.offeredSlotIds.includes($json.slotId)"
+    ps = w.set_fields("PendingSlot", [
+        ("pendingSlotId", f"={{{{ ({slot_set}) ? $json.slotId : (($json.state !== 'CONFIRM' && !$json.booked) ? '' : $json.prevPendingSlotId) }}}}", "string"),
+        ("guards", with_guard("pending_slot_set", slot_set), "array"),
+    ], 0, 0, keep=True)
+    for s, out in srcs:
+        w.link(s, ps, out)
+    srcs = w.guard_chain([(ps, 0)], [
+        ("FalseConfirmation", [w.cond("={{ $json.speak.toLowerCase() }}", "regex", CLAIMS_BOOKING), booked_false], "and",
+         "OnFalseConfirmation", [("speak", lang_pick(NOT_BOOKED_LINE), "string"),
+                                 ("state", "={{ ['BOOKED','WRAPUP'].includes($json.state) ? 'CONFIRM' : $json.state }}", "string"),
+                                 ("action", "={{ $json.action === 'end' ? 'continue' : $json.action }}", "string"),
+                                 ("guards", with_guard("false_confirmation"), "array")]),
+        ("ForceBooked", [w.cond("={{ $json.booked }}", "true", kind="boolean"),
+                         w.cond("={{ ['BOOKED','WRAPUP','HANDOFF'].includes($json.state) }}", "false", kind="boolean")], "and",
+         "OnForceBooked", [("state", "BOOKED", "string"), ("guards", with_guard("state_forced_booked"), "array")]),
+        ("EmptyReply", [w.cond("={{ $json.speak }}", "empty")], "and",
+         "OnEmptyReply", [("speak", lang_pick(REPEAT_LINE), "string"), ("guards", with_guard("empty_reply"), "array")]),
+        ("ReplyTooLong", [w.cond("={{ $json.speak.length }}", "gt", 400, kind="number")], "and",
+         "OnReplyTooLong", [("speak", "={{ $json.speak.slice(0, 397) + '...' }}", "string"), ("guards", with_guard("reply_truncated"), "array")]),
+        ("HandoffNormalise", [w.cond("={{ $json.action }}", "equals", "handoff")], "and",
+         "OnHandoff", [("state", "HANDOFF", "string"), ("handoffReason", "={{ $json.handoffReason || 'CALLER_REQUEST' }}", "string"),
+                       ("speak", "={{ $json.handoverLine || $json.speak }}", "string"),
+                       ("guards", "={{ $json.guards.concat($json.handoffReason ? [] : ['reason_defaulted']).concat($json.handoverLine ? ['handover_line'] : []) }}", "array")]),
+        ("ForceHandoff", [w.cond("={{ $json.state }}", "equals", "HANDOFF"), w.cond("={{ $json.action }}", "notEquals", "handoff")], "and",
+         "OnForceHandoff", [("action", "handoff", "string"), ("handoffReason", "={{ $json.handoffReason || 'SCENARIO_REQUIRES_AGENT' }}", "string"),
+                            ("speak", "={{ $json.handoverLine || $json.speak }}", "string"), ("guards", with_guard("action_forced_handoff"), "array")]),
+        ("EndBlocked", [w.cond("={{ $json.action }}", "equals", "end"), w.cond("={{ ['BOOKED','WRAPUP'].includes($json.state) }}", "false", kind="boolean")], "and",
+         "OnEndBlocked", [("action", "continue", "string"), ("guards", with_guard("end_blocked"), "array")]),
+    ])
+    gr = w.set_fields("GuardResult", [
+        (f, {"state": "={{ $json.action === 'end' ? 'WRAPUP' : $json.state }}",
+             "needsHandoff": "={{ $json.action === 'handoff' }}",
+             "errorCode": "={{ $json.guards.join(',') }}"}.get(f, f"={{{{ $json.{f} }}}}"),
+         {"guards": "array", "needsHandoff": "boolean", "turn": "number", "startedAt": "number"}.get(f, "string"))
+        for f in GUARD_RESULT_FIELDS], 0, 0)
+    for s, out in srcs:
+        w.link(s, gr, out)
+    return gr
+
+
+def agent_error_node(w):
+    """The agent threw (model down, parser gave up). Deterministic apology and a PLATFORM_ERROR handoff; no model involved."""
+    P = "$('PrepareTurn').first().json"
+    fixed = {"speak": lang_pick(TECH_ERROR_LINE, f"{P}.language"), "action": "handoff", "state": "HANDOFF", "intent": "UNKNOWN", "handoffReason": "PLATFORM_ERROR",
+             "summary": "={{ 'Dialogue agent failed: ' + String(($json.error || {}).message || ($json.error || {}).description || 'unknown').slice(0, 200) }}",
+             "guards": "={{ ['agent_error'] }}", "needsHandoff": True, "bookingRef": "", "confirmationCode": "", "pendingSlotId": "", "errorCode": "agent_error",
+             "caseId": f"={{{{ {P}.caseId || '' }}}}"}
+    return w.set_fields("HandleAgentError", [
+        (f, fixed.get(f, f"={{{{ {P}.{f} }}}}"), {"guards": "array", "needsHandoff": "boolean", "turn": "number", "startedAt": "number"}.get(f, "string"))
+        for f in GUARD_RESULT_FIELDS], 0, 0)
+
+
+def attach_handoff_expr():
+    """JSON-mode expression: the guard result that went through NeedsHandoff plus the handoff object built from BuildHandoff's output."""
+    G = "$('NeedsHandoff').first().json"
+    return (f"={{{{ Object.assign({{}}, {G}, {{ handoff: $json.ok "
+            f"? {{ intent: {G}.intent, handoffReason: {G}.handoffReason, caseId: {G}.caseId, uuiPayload: $json.uuiPayload, uuiHex: $json.uuiHex, uuiAscii: $json.uuiAscii, referTo: $json.referTo, truncated: $json.truncated, summary: {G}.summary }} "
+            f": {{ intent: {G}.intent, handoffReason: {G}.handoffReason, caseId: {G}.caseId, error: $json.error || 'handoff_build_failed' }} }}) }}}}")
+
 
 OUTPUT_SCHEMA = json.dumps({
     "type": "object",
@@ -863,11 +997,15 @@ def build_ar02():
     w.link(prs, ag, ctype="ai_outputParser")
     w.link(fix, prs, ctype="ai_languageModel")
     rl = w.dt("ReloadSession", "ar_sessions", "get", 2340, -260, conditions=[("sessionId", "={{ $('PrepareTurn').first().json.sessionId }}")])
-    gd = w.code("ApplyGuards", APPLY_GUARDS_JS, 2600, -260)
-    he = w.code("HandleAgentError", AGENT_ERROR_JS, 2340, -40)
+    gd = add_guards(w, rl)
+    he = agent_error_node(w)
     ih = w.if_node("NeedsHandoff", "={{ $json.needsHandoff }}", 2860, -260)
     bh = w.exec_wf("BuildHandoff", "ar-14-build-handoff", {"sessionId": "={{ $json.sessionId }}", "intent": "={{ $json.intent }}", "handoffReason": "={{ $json.handoffReason }}", "summary": "={{ $json.summary }}"}, 3120, -140)
-    cr = w.code("ComposeResponse", COMPOSE_RESPONSE_JS, 3380, -260)
+    ah = w.set_json("AttachHandoff", attach_handoff_expr(), 3250, -140)
+    cr = w.set_fields("ComposeResponse", [
+        ("response", "={{ { sessionId: $json.sessionId, correlationId: $json.correlationId, speak: $json.speak, action: $json.action, state: $json.state, intent: $json.intent, handoff: $json.handoff || null, endReason: $json.action === 'end' ? 'completed' : null, latencyMs: Date.now() - Number($json.startedAt), turn: $json.turn, guards: $json.guards } }}", "object"),
+        ("latencyMs", "={{ Date.now() - Number($json.startedAt) }}", "number"),
+    ], 3380, -260, keep=True)
     us = w.dt("UpdateSession", "ar_sessions", "update", 3640, -260, conditions=[("sessionId", "={{ $json.sessionId }}")],
               values={"state": "={{ $json.state }}", "intent": "={{ $json.intent }}", "turns": "={{ $json.turn }}", "lastLatencyMs": "={{ $json.latencyMs }}", "slotId": "={{ $json.bookingRef ? undefined : ($json.pendingSlotId || '') }}"})
     lg = w.exec_wf("LogTurn", "ar-17-log-event", {"correlationId": "={{ $('ComposeResponse').first().json.correlationId }}", "sessionId": "={{ $('ComposeResponse').first().json.sessionId }}", "caseId": "={{ $('ComposeResponse').first().json.caseId }}", "workflow": "AR-02", "event": "turn", "state": "={{ $('ComposeResponse').first().json.state }}", "tool": "", "latencyMs": "={{ $('ComposeResponse').first().json.latencyMs }}", "outcome": "={{ $('ComposeResponse').first().json.action }}", "errorCode": "={{ $('ComposeResponse').first().json.errorCode || '' }}", "detail": "={{ 'turn=' + $('ComposeResponse').first().json.turn + ' intent=' + $('ComposeResponse').first().json.intent + ($('ComposeResponse').first().json.handoffReason ? ' reason=' + $('ComposeResponse').first().json.handoffReason : '') }}"}, 3900, -260)
@@ -878,10 +1016,9 @@ def build_ar02():
     w.link(ifound, lm, 0); w.link(ifound, r404, 1)
     w.chain(lm, pt, ag)
     w.link(ag, rl, 0); w.link(ag, he, 1)
-    w.chain(rl, gd, ih)
+    w.link(gd, ih); w.link(he, ih)
     w.link(ih, bh, 0); w.link(ih, cr, 1)
-    w.link(he, bh)
-    w.link(bh, cr)
+    w.chain(bh, ah, cr)
     w.chain(cr, us, lg, rs)
     return w
 
@@ -1065,8 +1202,14 @@ ZONES = {
          "rows": [["LoadSession", "SessionFound", "LoadMarket"], [None, "RespondNotFound"]]},
         {"title": "Reason", "color": 5, "body": "PrepareTurn rebuilds the system prompt from facts and applies the yes/no gates. The agent has three tools, Postgres memory and a structured parser with auto-fix.",
          "rows": [["PrepareTurn", "DialogueAgent"], ["DialogueModel", "TurnMemory", "TurnOutputShape"], ["FindDealers", "FindSlots", "BookAppointment", "ParserFixerModel"]]},
-        {"title": "Guard", "color": 5, "body": "Code decides: no booking claim without a code, caller-request rule, gate advance, handover line. Handoff builds the Refer-To here.",
-         "rows": [["ReloadSession", "ApplyGuards", "NeedsHandoff", "BuildHandoff"], ["HandleAgentError"]]},
+        {"title": "Guards 1: gates", "color": 5, "body": "The model's output is clamped to the allowed values, then each rule is an If (the condition) and an Edit Fields (what it changes). Gates: a deterministic yes or no in IDENTIFY and CONSENT wins over the model.",
+         "rows": [["ReloadSession", "ReadOutput", "ClampOutput", "GateDecline", "GateAdvance", "ScenarioDowngrade"], [None, None, None, "OnGateDecline", "OnGateAdvance", "OnScenarioDowngrade"]]},
+        {"title": "Guards 2: caller and booking", "color": 5, "body": "Caller asks for a person: handoff. A booking claim without a confirmation code is replaced by a question. A booking made by a tool forces BOOKED.",
+         "rows": [["CallerAsksForHuman", "PendingSlot", "FalseConfirmation", "ForceBooked"], ["OnCallerRequest", None, "OnFalseConfirmation", "OnForceBooked"]]},
+        {"title": "Guards 3: reply and end", "color": 5, "body": "Empty or over-long replies are fixed. A handoff always speaks the market's handover line. No end before BOOKED or WRAPUP.",
+         "rows": [["EmptyReply", "ReplyTooLong", "HandoffNormalise", "ForceHandoff", "EndBlocked", "GuardResult"], ["OnEmptyReply", "OnReplyTooLong", "OnHandoff", "OnForceHandoff", "OnEndBlocked"]]},
+        {"title": "Handoff", "color": 3, "body": "A model failure answers with a fixed apology and PLATFORM_ERROR. Any handoff builds the Refer-To through AR-14.",
+         "rows": [["NeedsHandoff", "BuildHandoff", "AttachHandoff"], ["HandleAgentError"]]},
         {"title": "Respond", "color": 4, "body": "Session update, event row, the reply the gateway speaks.",
          "rows": [["ComposeResponse", "UpdateSession", "LogTurn", "RespondTurn"]]},
     ],
@@ -1107,8 +1250,8 @@ ZONES = {
          "rows": [["StoreOffered", "ReturnSlots"]]},
     ],
     "ar-13-book-appointment": [
-        {"title": "Validate", "color": 5, "body": "The slot must be one offered in this call, read back in CONFIRM, and confirmed in a later turn.",
-         "rows": [["ToolInput", "LoadSession", "ValidateSlot", "CanProceed"], [None, None, None, "ReturnValidation"]]},
+        {"title": "Booking gate", "color": 5, "body": "Rules in order: a booking already exists; the slot was not offered in this call; the caller has not confirmed it (state CONFIRM with this slotId read back). Only Proceed books.",
+         "rows": [["ToolInput", "LoadSession", "BookingGate", "BookingRequest"], [None, None, None, "ReplyAlreadyBooked"], [None, None, None, "ReplySlotNotOffered"], [None, None, None, "ReplyNotConfirmed"]]},
         {"title": "Book", "color": 3, "body": "Idempotency key session:slot. The confirmation code comes from DealerBook, never from the model.",
          "rows": [["CallDealerBookBook", "StoreBooking", "ReturnBooking"], ["ReturnBookError"]]},
     ],
